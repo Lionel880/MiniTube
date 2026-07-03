@@ -2,6 +2,13 @@
 
 一條一段，新的加在最上面。每條寫清楚：決策、為什麼、影響範圍。
 
+## 2026-07-03 — 不新增 MCP server；effortLevel 設 xhigh；不建 CLI alias
+
+- **決策**：使用者層級 MCP server 維持 0 個。專案 `settings.json` 設 `"effortLevel": "xhigh"`（官方文件已查證：settings 接受 low–xhigh，Opus 4.8 支援 xhigh、預設 high，不支援的模型自動降檔）。CLI alias（如 `copus`）不建立。
+- **為什麼**：MCP 沒有具體需求就不加——repo 無 GitHub remote、DB 檢查頻率低。xhigh 換更深推理，符合「長任務穩定」目標，成本可接受。alias 的前提是 `claude` CLI 在 PATH 上，但這台機器只裝了桌面 App，alias 沒有施力點。
+- **觸發條件（何時翻案）**：repo 推上 GitHub → 加 GitHub MCP；頻繁需要直接查 SQL Server 資料 → 評估 DB MCP；安裝 CLI（`npm i -g @anthropic-ai/claude-code`）→ 建 `copus` function。
+- **影響**：xhigh 對本專案所有 session 生效（含 Fable，token 花費上升）；單次 session 可用 `/effort` 覆蓋。
+
 ## 2026-07-03 — 測試資料庫改用 H2 in-memory（MSSQLServer 相容模式）
 
 - **決策**：`src/test/resources/application.yaml` 覆蓋 datasource 指向 H2，`ddl-auto: create-drop`；pom 加 `com.h2database:h2`（test scope）。
