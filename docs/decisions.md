@@ -2,6 +2,12 @@
 
 一條一段，新的加在最上面。每條寫清楚：決策、為什麼、影響範圍。
 
+## 2026-07-03 — 資料庫帳密改環境變數注入（推翻同日稍早的「維持明文提交」決策）
+
+- **決策**：`application.yaml` 的 datasource 帳密改為 `${DB_USERNAME:sa}` / `${DB_PASSWORD:}`（密碼無預設值，未設定時啟動即失敗）。舊密碼 `Qw106969` 已存在於 git 歷史中，**必須更換**（`ALTER LOGIN`），更換後歷史裡的舊值即失效，不需要改寫 git 歷史。
+- **為什麼**：平行 session 已加入 gh-pages 部署設定（commit `11c95b8`），repo 即將接上 GitHub remote；「無 remote 所以明文可接受」的前提消失了。
+- **影響**：所有人（含兩個平行 Claude session）下次啟動後端前，必須先設好使用者層級的 `DB_PASSWORD` 環境變數並重開終端機／App。部署到任何真實環境時，`JWT_SECRET` 也必須設環境變數（yaml 內的預設值會隨 repo 公開）。
+
 ## 2026-07-03 — 不新增 MCP server；effortLevel 設 xhigh；不建 CLI alias
 
 - **決策**：使用者層級 MCP server 維持 0 個。專案 `settings.json` 設 `"effortLevel": "xhigh"`（官方文件已查證：settings 接受 low–xhigh，Opus 4.8 支援 xhigh、預設 high，不支援的模型自動降檔）。CLI alias（如 `copus`）不建立。

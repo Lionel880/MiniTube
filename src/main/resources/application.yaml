@@ -2,10 +2,12 @@ spring:
   application:
     name: mini-youtube
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=MiniYoutube;encrypt=true;trustServerCertificate=true
-    username: sa
-    password: Qw106969
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:minitube}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:postgres}}
+    driver-class-name: org.postgresql.Driver
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: true

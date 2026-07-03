@@ -67,4 +67,10 @@ Spring Boot 4.0.6 app, Java 21, package root `mini_youtube` (note underscore —
 
 ## Database
 
-`application.yaml` points at a local SQL Server instance (`localhost:1433`, database `MiniYoutube`) with credentials committed in plaintext. Treat these as dev-only placeholders, not real secrets, and update the URL if pointing at a different SQL Server instance.
+`application.yaml` points at a local SQL Server instance (`localhost:1433`, database `MiniYoutube`). Credentials are injected via environment variables — `DB_USERNAME` (default `sa`) and `DB_PASSWORD` (no default; the app fails fast at startup if unset). For local dev, set a user-level env var once and restart the terminal/app:
+
+```powershell
+[Environment]::SetEnvironmentVariable('DB_PASSWORD','<password>','User')
+```
+
+Update the URL if pointing at a different SQL Server instance. Tests are unaffected (they run on H2, see `src/test/resources/application.yaml`).
