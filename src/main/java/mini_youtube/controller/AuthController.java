@@ -1,5 +1,9 @@
 package mini_youtube.controller;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,42 +27,36 @@ public class AuthController {
 
     private final UserService userService;
 
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite;
+
     @PostMapping("/register")
     public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
         return userService.register(request);
     }
 
     @PostMapping("/login")
-    public org.springframework.http.ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse loginResponse = userService.login(request);
-        
-        // 將 JWT Token 設定為 HttpOnly Cookie，阻止前端 JavaScript 讀取 (防範 XSS)
-        org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("token", loginResponse.getToken())
-                .httpOnly(true)
-                .secure(true) // 在 HTTPS 與開發用 localhost 均為安全傳輸 (Chrome 支援 localhost HTTP 傳 Secure Cookie)
-                .path("/")
-                .sameSite("None") // 支援前後端跨域部署 (如 GitHub Pages 與 Render)
-                .maxAge(7 * 24 * 60 * 60) // 7 天有效期限
-                .build();
 
-        return org.springframework.http.ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new LoginResponse(null)); // 響應體清空 Token，避免暴露給前端 JS
+        // 將 JWT Token 設定為 HttpOnly Cookie，阻止前端 JavaScript 讀取 (防範 XSS)
+        ResponseCookie cookie = buildTokenCookie(loginResponse.getToken(), 7 * 24 * 60 * 60);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(loginResponse);
     }
 
     @PostMapping("/logout")
-    public org.springframework.http.ResponseEntity<Void> logout() {
-        // 清除 Cookie
-        org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("token", "")
-                .httpOnly(true)
-                .secure(true)
-                .path("/")
-                .sameSite("None")
-                .maxAge(0) // 立即過期
-                .build();
+    public ResponseEntity<Void> logout() {
+        // maxAge=0 讓瀏覽器立刻清除此 Cookie
+        ResponseCookie cookie = buildTokenCookie("", 0);
 
-        return org.springframework.http.ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString())
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .build();
     }
 
@@ -66,5 +64,20 @@ public class AuthController {
     @GetMapping("/me")
     public MeResponse me(Authentication authentication) {
         return new MeResponse(authentication.getName());
+    }
+
+    /**
+     * 建立統一的 token Cookie。
+     * secure 與 sameSite 由 application.yaml 注入，支援本地開發 (HTTP/Lax) 與
+     * 雲端部署 (HTTPS/None) 兩種模式。
+     */
+    private ResponseCookie buildTokenCookie(String tokenValue, long maxAge) {
+        return ResponseCookie.from("token", tokenValue)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .sameSite(cookieSameSite)
+                .maxAge(maxAge)
+                .build();
     }
 }

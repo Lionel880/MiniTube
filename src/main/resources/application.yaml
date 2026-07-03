@@ -25,3 +25,8 @@ jwt:
 app:
   # 影片檔案在本機磁碟的儲存目錄（相對於專案執行目錄，會自動建立）
   upload-dir: uploads/videos
+  cookie:
+    # 本地開發預設為 false（HTTP 可用），部署至 HTTPS 時設為 true
+    secure: ${COOKIE_SECURE:false}
+    # 本地開發預設 Lax（同源），部署至跨域 (GitHub Pages→Render) 時設為 None
+    same-site: ${COOKIE_SAMESITE:Lax}
