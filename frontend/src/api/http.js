@@ -9,6 +9,9 @@ const http = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
   withCredentials: true, // 啟用跨網域傳遞 Cookie (例如 GitHub Pages -> Render)
+  headers: {
+    "Bypass-Tunnel-Reminder": "true",
+  },
 });
 
 // --- 記憶體內 token (由 auth store 設定) ---
