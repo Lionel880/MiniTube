@@ -11,8 +11,8 @@ spring:
     show-sql: true
   servlet:
     multipart:
-      max-file-size: 1024MB
-      max-request-size: 4096MB
+      max-file-size: 3072MB
+      max-request-size: 12288MB
 server:
   # 預設 8080；若外部（如 preview 工具）指定 PORT 環境變數則優先使用
   port: ${PORT:8080}
