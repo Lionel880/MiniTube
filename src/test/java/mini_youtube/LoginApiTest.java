@@ -65,4 +65,27 @@ public class LoginApiTest {
             userService.login(nonExistentUserRequest);
         });
     }
+
+    @Test
+    public void testLoginLockout() {
+        String username = "lockout_user_" + UUID.randomUUID().toString().substring(0, 8);
+        LoginRequest request = new LoginRequest();
+        request.setUsername(username);
+        request.setPassword("wrong_password");
+
+        // 登入失敗 5 次
+        for (int i = 0; i < 5; i++) {
+            assertThrows(RuntimeException.class, () -> {
+                userService.login(request);
+            });
+        }
+
+        // 第 6 次登入應被直接攔截並拋出 "帳號已被暫時鎖定" 異常
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            userService.login(request);
+        });
+
+        assertTrue(exception.getMessage().contains("帳號已被暫時鎖定"), 
+                   "應拋出帳號鎖定異常，實際訊息: " + exception.getMessage());
+    }
 }
