@@ -2,7 +2,15 @@ import axios from "axios";
 
 // 統一的 axios 實例。優先讀取 localStorage 的自訂 API 網址，無設定則預設使用 "/api"
 const getBaseURL = () => {
-  return localStorage.getItem("minitube_api_url") || "/api";
+  let url = localStorage.getItem("minitube_api_url");
+  if (url) {
+    url = url.trim();
+    if (!url.endsWith("/api") && !url.endsWith("/api/")) {
+      url = url.replace(/\/+$/, "") + "/api";
+    }
+    return url;
+  }
+  return "/api";
 };
 
 const http = axios.create({
