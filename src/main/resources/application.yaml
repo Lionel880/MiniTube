@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: mini-youtube
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=MiniYoutube;encrypt=true;trustServerCertificate=true
+    username: sa
+    password: Qw106969
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  servlet:
+    multipart:
+      max-file-size: 1024MB
+      max-request-size: 4096MB
+server:
+  # 預設 8080；若外部（如 preview 工具）指定 PORT 環境變數則優先使用
+  port: ${PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET:mini_youtube_very_secure_secret_key_must_be_long_enough_2026}
+
+app:
+  # 影片檔案在本機磁碟的儲存目錄（相對於專案執行目錄，會自動建立）
+  upload-dir: uploads/videos

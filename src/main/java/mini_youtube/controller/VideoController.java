@@ -1,0 +1,150 @@
+package mini_youtube.controller;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
+
+import org.springframework.core.io.UrlResource;
+import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import mini_youtube.dto.Request.UpdateVideoRequest;
+import mini_youtube.dto.Response.VideoDetailResponse;
+import mini_youtube.dto.Response.VideoListResponse;
+import mini_youtube.service.VideoService;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/videos")
+public class VideoController {
+
+    private static final long CHUNK_SIZE = 1024 * 1024L; // 1MB
+    private static final String ANONYMOUS = "anonymousUser";
+
+    private final VideoService videoService;
+
+    @PostMapping(value = "/upload")
+    public VideoDetailResponse upload(
+            Authentication authentication,
+            @RequestParam("title") String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestPart("file") MultipartFile file) {
+        return videoService.upload(authentication.getName(), title, description, file);
+    }
+
+    @PostMapping(value = "/upload/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public List<VideoDetailResponse> uploadBatch(
+            Authentication authentication,
+            @RequestParam("files") MultipartFile[] files) {
+        return videoService.uploadBatch(authentication.getName(), files);
+    }
+
+    @GetMapping
+    public VideoListResponse list(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return videoService.list(authentication.getName(), page, size, sortBy, sortDir);
+    }
+
+    @GetMapping("/search")
+    public VideoListResponse search(
+            Authentication authentication,
+            @RequestParam("q") String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        return videoService.search(authentication.getName(), keyword, page, size, sortBy, sortDir);
+    }
+
+    @PutMapping("/{id}")
+    public VideoDetailResponse update(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateVideoRequest request,
+            Authentication authentication) {
+        return videoService.update(id, authentication.getName(), request);
+    }
+
+    @GetMapping("/{id}")
+    public VideoDetailResponse getById(@PathVariable Long id, Authentication authentication) {
+        return videoService.getById(id, currentUsername(authentication));
+    }
+
+    @DeleteMapping("/batch")
+    public ResponseEntity<Void> batchDelete(
+            @RequestBody List<Long> ids,
+            Authentication authentication) {
+        videoService.batchDelete(ids, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 影片串流端點，支援 HTTP Range 請求，讓 <video> 標籤可以拖曳進度條。
+     */
+    @GetMapping("/{id}/stream")
+    public ResponseEntity<ResourceRegion> stream(
+            @PathVariable Long id,
+            @RequestHeader HttpHeaders headers) throws IOException {
+
+        Path filePath = videoService.resolveVideoFilePath(id);
+        UrlResource videoResource = new UrlResource(filePath.toUri());
+        long contentLength = videoResource.contentLength();
+
+        List<HttpRange> ranges = headers.getRange();
+        ResourceRegion region;
+        HttpStatus status;
+
+        if (ranges.isEmpty()) {
+            long rangeLength = Math.min(CHUNK_SIZE, contentLength);
+            region = new ResourceRegion(videoResource, 0, rangeLength);
+            status = HttpStatus.OK;
+        } else {
+            HttpRange range = ranges.get(0);
+            long start = range.getRangeStart(contentLength);
+            long end = range.getRangeEnd(contentLength);
+            long rangeLength = Math.min(CHUNK_SIZE, end - start + 1);
+            region = new ResourceRegion(videoResource, start, rangeLength);
+            status = HttpStatus.PARTIAL_CONTENT;
+        }
+
+        MediaType mediaType = MediaTypeFactory.getMediaType(videoResource)
+                .orElse(MediaType.valueOf("video/mp4"));
+
+        return ResponseEntity.status(status)
+                .contentType(mediaType)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .body(region);
+    }
+
+    private String currentUsername(Authentication authentication) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || ANONYMOUS.equals(authentication.getName())) {
+            return null;
+        }
+        return authentication.getName();
+    }
+}
