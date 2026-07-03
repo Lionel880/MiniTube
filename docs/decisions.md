@@ -2,6 +2,15 @@
 
 一條一段，新的加在最上面。每條寫清楚：決策、為什麼、影響範圍。
 
+## 2026-07-04 — 全面安全稽核與修復（含 Vercel 部署修正）
+
+- **決策**：執行完整安全稽核，修復 2 項 CRITICAL、3 項 HIGH、6 項 MEDIUM 安全問題。
+- **CRITICAL 修復**：(1) `application.yaml` 中資料庫密碼 `!Qw1069` 與 JWT 密鑰的硬編碼預設值全部移除，改為空預設值（未設環境變數則啟動失敗）。(2) 上傳目錄的 NAS 內網路徑 `\\192.168.0.202\Disk1share\MiniTubeVideos` 改為環境變數 `APP_UPLOAD_DIR`，預設 `uploads/videos`。
+- **HIGH 修復**：(1) CORS 的 `https://*.vercel.app` 萬用字元收斂為 `https://mini-tube*-lionel880s-projects.vercel.app`，防止任意 Vercel 站點發起跨域請求。(2) `.gitignore` 加入 `.env*` 與 `application-local/prod.yaml` 排除規則。
+- **MEDIUM 修復**：(1) `show-sql` 預設改為 `false`。(2) `JwtAuthenticationFilter` 原本靜默吞掉例外，改為 `log.warn` 記錄失敗。(3) `GlobalExceptionHandler` 的 `printStackTrace()` 改為 SLF4J `log.error`。(4) NavBar 的 API URL 設定加入 `http(s)://` 格式驗證。(5) `http.js` 的 `getBaseURL()` 自動為自訂 URL 補上 `/api` 後綴。
+- **Vercel 部署修正**：發現使用者的 Vercel 站點顯示的是 Vercel 自身的登入頁面（而非 MiniTube Vue 前端），原因是 Vercel 專案的 Root Directory 未設為 `frontend/`。新增 `frontend/vercel.json` 做 SPA rewrite fallback。
+- **影響**：本機啟動後端前需設定 `SPRING_DATASOURCE_PASSWORD` 和 `JWT_SECRET` 兩個環境變數。舊的硬編碼密碼仍在 git 歷史中，SQL Server 的 `sa` 密碼應盡快更換。Vercel 使用者需到 Dashboard 將 Root Directory 改為 `frontend`。
+
 ## 2026-07-03 — 遷移至 PostgreSQL、CORS 開放 GitHub Pages（平行 session 決策，本條為事後補記）
 
 - **決策**（commit `7496677`，由另一個 Claude session 做成）：`mssql-jdbc` → `org.postgresql`；連線參數改 `SPRING_DATASOURCE_*`／`DB_*` 巢狀環境變數（dev 預設 `postgres`/`postgres`，非機密）；CORS 加 `https://lionel880.github.io`。

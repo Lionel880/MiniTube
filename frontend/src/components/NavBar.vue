@@ -24,6 +24,11 @@ function onSetApiUrl() {
   if (newUrl !== null) {
     const trimmed = newUrl.trim();
     if (trimmed) {
+      // 僅允許 http:// 或 https:// 開頭的網址，防止非預期的 URL scheme
+      if (!/^https?:\/\//i.test(trimmed)) {
+        alert("錯誤：API 網址必須以 http:// 或 https:// 開頭");
+        return;
+      }
       localStorage.setItem("minitube_api_url", trimmed);
       alert("API 網址已設定為：" + trimmed + "\n網頁即將重新整理以套用新設定！");
       window.location.reload();

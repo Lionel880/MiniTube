@@ -64,7 +64,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "https://*.vercel.app",
+            "https://mini-tube*-lionel880s-projects.vercel.app",
             "https://lionel880.github.io"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

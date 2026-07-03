@@ -12,12 +12,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import mini_youtube.dto.Response.ApiErrorResponse;
 
 /**
  * 全域例外處理：避免 Controller 拋出的例外以未經包裝的 500 錯誤呈現給前端，
  * 統一回傳 { status, message, path, timestamp } 格式的 JSON。
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -54,7 +56,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGeneralException(
             Exception ex, HttpServletRequest request) {
-        ex.printStackTrace(); // 為了除錯，在主控台輸出 stack trace，但不暴露給 API 響應
+        log.error("未預期的例外 [{}]", request.getRequestURI(), ex);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "系統發生未預期的錯誤，請稍後再試", request);
     }
 
@@ -68,3 +70,4 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(error);
     }
 }
+

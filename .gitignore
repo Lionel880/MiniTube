@@ -41,3 +41,16 @@ build/
 
 ### Claude Code（個人本機設定，不進版控） ###
 .claude/settings.local.json
+
+### 環境變數與密鑰（絕對不可提交） ###
+.env
+.env.*
+!.env.example
+*.env
+
+### Spring Boot 環境 profile（可能含真實密碼） ###
+src/main/resources/application-local.yaml
+src/main/resources/application-prod.yaml
+src/main/resources/application-local.yml
+src/main/resources/application-prod.yml
+

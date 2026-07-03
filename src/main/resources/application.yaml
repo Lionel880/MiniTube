@@ -4,13 +4,13 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://localhost:1433;databaseName=MiniYoutube;encrypt=false}
     username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:!Qw1069}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     database-platform: org.hibernate.dialect.SQLServerDialect
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${SHOW_SQL:false}
   servlet:
     multipart:
       max-file-size: 3072MB
@@ -20,11 +20,11 @@ server:
   port: ${PORT:8080}
 
 jwt:
-  secret: ${JWT_SECRET:mini_youtube_very_secure_secret_key_must_be_long_enough_2026}
+  secret: ${JWT_SECRET:}
 
 app:
   # 影片檔案在本機磁碟的儲存目錄（相對於專案執行目錄，會自動建立）
-  upload-dir: "\\\\192.168.0.202\\Disk1share\\MiniTubeVideos"
+  upload-dir: ${APP_UPLOAD_DIR:uploads/videos}
   cookie:
     # 本地開發預設為 false（HTTP 可用），部署至 HTTPS 時設為 true
     secure: ${COOKIE_SECURE:false}
