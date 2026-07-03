@@ -41,6 +41,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse loginResponse = userService.login(request);
+        loginResponse.setUsername(request.getUsername());
 
         // 將 JWT Token 設定為 HttpOnly Cookie，阻止前端 JavaScript 讀取 (防範 XSS)
         ResponseCookie cookie = buildTokenCookie(loginResponse.getToken(), 7 * 24 * 60 * 60);

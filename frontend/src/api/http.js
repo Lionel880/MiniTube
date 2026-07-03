@@ -9,8 +9,21 @@ const http = axios.create({
   withCredentials: true, // 啟用跨網域傳遞 Cookie (例如 GitHub Pages -> Render)
 });
 
-// 每次發送請求前，自動攜帶 Cookie (不需前端手動寫入 Authorization header)
+// --- 記憶體內 token (由 auth store 設定) ---
+let _memoryToken = "";
+export function setMemoryToken(token) {
+  _memoryToken = token;
+}
+export function getMemoryToken() {
+  return _memoryToken;
+}
+
+// 每次發送請求前，如果記憶體中有 token 就加到 Authorization header
+// 這是 HttpOnly Cookie 的備援機制，確保即使 Cookie 沒被瀏覽器接受，請求仍然帶有認證
 http.interceptors.request.use((config) => {
+  if (_memoryToken) {
+    config.headers.Authorization = `Bearer ${_memoryToken}`;
+  }
   return config;
 });
 
@@ -22,12 +35,6 @@ http.interceptors.response.use(
       error.response?.data?.message ||
       error.message ||
       "發生未知錯誤，請稍後再試";
-
-    // 401：token 失效或未登入，清除本機登入狀態
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("username");
-    }
 
     return Promise.reject(new Error(message));
   }

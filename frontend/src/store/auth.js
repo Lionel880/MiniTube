@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { login as apiLogin, register as apiRegister, fetchMe, logout as apiLogout } from "../api/auth";
+import { setMemoryToken } from "../api/http";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -12,12 +13,31 @@ export const useAuthStore = defineStore("auth", {
 
   actions: {
     async login(credentials) {
-      await apiLogin(credentials);
+      const data = await apiLogin(credentials);
 
-      // 登入成功後立刻用 /api/auth/me 換回目前使用者名稱，並存起來供畫面顯示
-      const me = await fetchMe();
-      this.username = me.username;
-      localStorage.setItem("username", me.username);
+      // 後端同時回傳 token (body) + 設定 HttpOnly Cookie
+      // 將 token 存入記憶體，供 Authorization header 作為備援使用
+      if (data.token) {
+        setMemoryToken(data.token);
+      }
+
+      // 使用回應中的 username，或退回使用輸入的帳號
+      this.username = data.username || credentials.username;
+      localStorage.setItem("username", this.username);
+    },
+
+    /** 頁面重新整理時用 Cookie 恢復登入狀態 */
+    async restoreSession() {
+      try {
+        const me = await fetchMe();
+        this.username = me.username;
+        localStorage.setItem("username", me.username);
+      } catch {
+        // Cookie 已失效，清除本機登入狀態
+        this.username = "";
+        setMemoryToken("");
+        localStorage.removeItem("username");
+      }
     },
 
     async register(payload) {
@@ -31,6 +51,7 @@ export const useAuthStore = defineStore("auth", {
         // 忽略登出網路錯誤
       }
       this.username = "";
+      setMemoryToken("");
       localStorage.removeItem("username");
     },
   },
