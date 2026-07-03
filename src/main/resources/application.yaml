@@ -2,12 +2,12 @@ spring:
   application:
     name: mini-youtube
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:minitube}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:postgres}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:postgres}}
-    driver-class-name: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://localhost:1433;databaseName=MiniYoutube;encrypt=false}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:!Qw1069}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.SQLServerDialect
     hibernate:
       ddl-auto: update
     show-sql: true
@@ -24,7 +24,7 @@ jwt:
 
 app:
   # 影片檔案在本機磁碟的儲存目錄（相對於專案執行目錄，會自動建立）
-  upload-dir: uploads/videos
+  upload-dir: "\\\\192.168.0.202\\Disk1share\\MiniTubeVideos"
   cookie:
     # 本地開發預設為 false（HTTP 可用），部署至 HTTPS 時設為 true
     secure: ${COOKIE_SECURE:false}

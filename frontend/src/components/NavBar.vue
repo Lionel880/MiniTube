@@ -17,6 +17,23 @@ function onLogout() {
   authStore.logout();
   router.push({ name: "home" });
 }
+
+function onSetApiUrl() {
+  const current = localStorage.getItem("minitube_api_url") || "";
+  const newUrl = prompt("請輸入後端 API 公網網址 (例如 https://xxxx.loca.lt 或是 http://114.34.34.4:8080)\n留空則還原本地預設值 (/api) :", current);
+  if (newUrl !== null) {
+    const trimmed = newUrl.trim();
+    if (trimmed) {
+      localStorage.setItem("minitube_api_url", trimmed);
+      alert("API 網址已設定為：" + trimmed + "\n網頁即將重新整理以套用新設定！");
+      window.location.reload();
+    } else {
+      localStorage.removeItem("minitube_api_url");
+      alert("已還原本地預設值 (/api)，網頁即將重新整理！");
+      window.location.reload();
+    }
+  }
+}
 </script>
 
 <template>
@@ -29,6 +46,7 @@ function onLogout() {
     </form>
 
     <div class="nav-actions">
+      <button class="btn" type="button" @click="onSetApiUrl" title="設定 API 伺服器網址">⚙️ 設定 API</button>
       <template v-if="authStore.isLoggedIn">
         <RouterLink class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
         <span class="username-tag">{{ authStore.username }}</span>
