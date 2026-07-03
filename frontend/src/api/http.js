@@ -6,14 +6,11 @@ import axios from "axios";
 const http = axios.create({
   baseURL: "/api",
   timeout: 30000,
+  withCredentials: true, // 啟用跨網域傳遞 Cookie (例如 GitHub Pages -> Render)
 });
 
-// 每次發送請求前，自動帶上登入後取得的 JWT token
+// 每次發送請求前，自動攜帶 Cookie (不需前端手動寫入 Authorization header)
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 });
 

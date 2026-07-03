@@ -1,21 +1,18 @@
 import { defineStore } from "pinia";
-import { login as apiLogin, register as apiRegister, fetchMe } from "../api/auth";
+import { login as apiLogin, register as apiRegister, fetchMe, logout as apiLogout } from "../api/auth";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
-    token: localStorage.getItem("token") || "",
     username: localStorage.getItem("username") || "",
   }),
 
   getters: {
-    isLoggedIn: (state) => !!state.token,
+    isLoggedIn: (state) => !!state.username,
   },
 
   actions: {
     async login(credentials) {
-      const data = await apiLogin(credentials);
-      this.token = data.token;
-      localStorage.setItem("token", data.token);
+      await apiLogin(credentials);
 
       // 登入成功後立刻用 /api/auth/me 換回目前使用者名稱，並存起來供畫面顯示
       const me = await fetchMe();
@@ -27,10 +24,13 @@ export const useAuthStore = defineStore("auth", {
       return apiRegister(payload);
     },
 
-    logout() {
-      this.token = "";
+    async logout() {
+      try {
+        await apiLogout();
+      } catch (err) {
+        // 忽略登出網路錯誤
+      }
       this.username = "";
-      localStorage.removeItem("token");
       localStorage.removeItem("username");
     },
   },

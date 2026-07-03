@@ -23,6 +23,7 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final LoginAttemptService loginAttemptService;
 
     public RegisterResponse register(RegisterRequest request) {
         User user = new User();
@@ -40,13 +41,23 @@ public class UserService implements UserDetailsService {
     }
 
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new BusinessException("帳號或密碼錯誤"));
+        String username = request.getUsername();
+        if (loginAttemptService.isBlocked(username)) {
+            throw new BusinessException("帳號已被暫時鎖定，請於 15 分鐘後再試");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    loginAttemptService.loginFailed(username);
+                    return new BusinessException("帳號或密碼錯誤");
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            loginAttemptService.loginFailed(username);
             throw new BusinessException("帳號或密碼錯誤");
         }
 
+        loginAttemptService.loginSucceeded(username);
         String token = jwtUtil.generateToken(user.getUsername());
         return new LoginResponse(token);
     }

@@ -11,3 +11,7 @@ export function login({ username, password }) {
 export function fetchMe() {
   return http.get("/auth/me").then((res) => res.data);
 }
+
+export function logout() {
+  return http.post("/auth/logout").then((res) => res.data);
+}
