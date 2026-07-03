@@ -22,6 +22,7 @@ Always write implementation plans, responses, explanations, and walkthroughs in 
 10. **環境診斷優先**：後端連不上時先定位再行動——`Test-NetConnection localhost -Port 1433`（SQL Server）、`-Port 8080`（後端）——再決定重試、重啟或明確請使用者啟動服務；不要停在錯誤訊息上等救援。
 11. **可讀性優先**：完整句子、講清楚為什麼；不用箭頭鏈（A → B → 掛了）、不堆縮寫、不要求讀者回頭對照編號。
 12. **平行工具呼叫**：無相依關係的工具呼叫在同一回應中一次發出，不逐一等待。
+13. **決策留痕**：重大技術決策（架構、安全、資料模型、對外行為）記錄到 `docs/decisions.md`——一條一段，寫清楚「為什麼」與取捨。
 
 ## Commands
 
@@ -33,7 +34,7 @@ This is a Maven project; use the Maven wrapper (`./mvnw` on macOS/Linux, `mvnw.c
 - Run a single test class: `./mvnw test -Dtest=LoginApiTest`
 - Run a single test method: `./mvnw test -Dtest=LoginApiTest#methodName`
 
-Both test classes are `@SpringBootTest` and require the local SQL Server (port 1433) to be running — there is no in-memory test database.
+Tests run against an in-memory H2 database (`src/test/resources/application.yaml` shadows the main config), so `./mvnw test` needs no local SQL Server — that is only required to run the app itself.
 
 The backend listens on port 8080 by default; `server.port` is `${PORT:8080}` (`src/main/resources/application.yaml`), so the `PORT` environment variable overrides it (used by preview/dev-server tooling when 8080 is taken).
 

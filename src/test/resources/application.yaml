@@ -1,0 +1,25 @@
+# 測試專用設定：完全取代 main 的 application.yaml（同名檔案在 test classpath 優先）。
+# 使用 in-memory H2（MSSQLServer 相容模式），讓 `mvnw test` 不依賴本機 SQL Server。
+spring:
+  application:
+    name: mini-youtube
+  datasource:
+    url: jdbc:h2:mem:minitube;MODE=MSSQLServer;DATABASE_TO_LOWER=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  servlet:
+    multipart:
+      max-file-size: 3072MB
+      max-request-size: 12288MB
+
+jwt:
+  secret: test_only_jwt_secret_key_must_be_at_least_256_bits_long_0000
+
+app:
+  # 測試時的上傳目錄放 target/ 下，clean 會一併清掉
+  upload-dir: target/test-uploads
