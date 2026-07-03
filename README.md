@@ -1,4 +1,4 @@
-# Mini YouTube
+# MiniTube
 
 簡易版 YouTube：Spring Boot（後端 API）＋ Vue 3（前端）。支援註冊 / 登入、上傳影片、影片列表、播放（含拖曳進度條）、搜尋、按讚、留言。
 
