@@ -2,6 +2,12 @@
 
 一條一段，新的加在最上面。每條寫清楚：決策、為什麼、影響範圍。
 
+## 2026-07-03 — 遷移至 PostgreSQL、CORS 開放 GitHub Pages（平行 session 決策，本條為事後補記）
+
+- **決策**（commit `7496677`，由另一個 Claude session 做成）：`mssql-jdbc` → `org.postgresql`；連線參數改 `SPRING_DATASOURCE_*`／`DB_*` 巢狀環境變數（dev 預設 `postgres`/`postgres`，非機密）；CORS 加 `https://lionel880.github.io`。
+- **為什麼（推斷）**：配合 GitHub Pages 前端部署，後端預計部署到雲端，Postgres 的雲端託管成本與可得性優於 SQL Server。
+- **影響**：本機 5432 目前**沒有** PostgreSQL 在跑 → 後端在本機暫時無法啟動，需安裝並啟動 Postgres（建 `minitube` 資料庫），或設 `SPRING_DATASOURCE_URL` 指向遠端。既有 SQL Server 內的資料不會自動搬移。測試 H2 相容模式已同步改為 `MODE=PostgreSQL`。此變更取代同日稍早的「帳密改 `${DB_USERNAME:sa}`」方案；工作樹已無任何真實密碼。**遺留**：舊 SQL Server 密碼仍在 git 歷史（`178326a` 起），push 前擇一——更換該密碼（建議，一行 T-SQL）或改寫歷史。
+
 ## 2026-07-03 — 資料庫帳密改環境變數注入（推翻同日稍早的「維持明文提交」決策）
 
 - **決策**：`application.yaml` 的 datasource 帳密改為 `${DB_USERNAME:sa}` / `${DB_PASSWORD:}`（密碼無預設值，未設定時啟動即失敗）。舊密碼 `Qw106969` 已存在於 git 歷史中，**必須更換**（`ALTER LOGIN`），更換後歷史裡的舊值即失效，不需要改寫 git 歷史。

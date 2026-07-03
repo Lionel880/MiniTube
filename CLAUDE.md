@@ -52,14 +52,14 @@ In dev mode Vite proxies `/api` → `http://localhost:8080` (`frontend/vite.conf
 Spring Boot 4.0.6 app, Java 21, package root `mini_youtube` (note underscore — `mini-youtube` is not a valid Java package name, see `HELP.md`).
 
 - **Layering**: `controller` → `service` → `repository` → `entity`, with `dto/Request` and `dto/Response` used at the controller boundary (never expose entities directly).
-- **Persistence**: Spring Data JPA against SQL Server (`mssql-jdbc`), `ddl-auto: update` — schema is auto-migrated from entities on startup, no separate migration tool.
+- **Persistence**: Spring Data JPA against PostgreSQL (`org.postgresql`, migrated from SQL Server on 2026-07-03), `ddl-auto: update` — schema is auto-migrated from entities on startup, no separate migration tool.
 - **Security**: `config/SecurityConfig.java` defines the `SecurityFilterChain`. CSRF disabled, sessions STATELESS, `JwtAuthenticationFilter` runs before username/password auth. Route rules in declaration order (first match wins — keep `/api/auth/me` above the `/api/auth/**` rule):
   1. `/api/auth/me` — authenticated
   2. `/hello`, `/api/auth/**` — permitAll
   3. `GET /api/videos`, `GET /api/videos/search` — authenticated (listings are per-user)
   4. `GET /api/videos/**` — permitAll (detail + streaming stay public so the `<video>` tag works without a JWT header)
   5. everything else — authenticated
-  CORS allows only `http://localhost:5173` / `http://127.0.0.1:5173`. Unauthenticated/forbidden requests get JSON errors via `RestAuthenticationEntryPoint` / `RestAccessDeniedHandler`.
+  CORS allows `http://localhost:5173` / `http://127.0.0.1:5173` (dev) and `https://lionel880.github.io` (GitHub Pages). Unauthenticated/forbidden requests get JSON errors via `RestAuthenticationEntryPoint` / `RestAccessDeniedHandler`.
 - **Auth**: `AuthController` (`/api/auth/register`, `/api/auth/login`, `/api/auth/me`) delegates to `UserService` (BCrypt password hashing). Login issues a JWT (`security/JwtUtil`, jjwt 0.12, secret from `${JWT_SECRET:...}` in `application.yaml`); `JwtAuthenticationFilter` validates the `Authorization: Bearer` header on every request.
 - **Errors**: services throw `BusinessException` for user-facing failures; `exception/GlobalExceptionHandler` (`@RestControllerAdvice`) maps it — plus validation, upload-size, and DB-constraint errors — to a JSON body `{ status, message, path, timestamp }`. No raw 500s or stack traces reach the client.
 - **Videos**: multipart upload (limits 3 GB/file, 12 GB/request) stored on local disk under `uploads/videos` (`app.upload-dir`, handled by `FileStorageService`); metadata lives in the `videos` table.
@@ -67,10 +67,6 @@ Spring Boot 4.0.6 app, Java 21, package root `mini_youtube` (note underscore —
 
 ## Database
 
-`application.yaml` points at a local SQL Server instance (`localhost:1433`, database `MiniYoutube`). Credentials are injected via environment variables — `DB_USERNAME` (default `sa`) and `DB_PASSWORD` (no default; the app fails fast at startup if unset). For local dev, set a user-level env var once and restart the terminal/app:
+`application.yaml` points at PostgreSQL (default `localhost:5432`, database `minitube`). All connection settings are env-var injected with dev defaults: `SPRING_DATASOURCE_URL` (or the trio `DB_HOST` / `DB_PORT` / `DB_NAME`), `SPRING_DATASOURCE_USERNAME` / `DB_USERNAME` (default `postgres`), and `SPRING_DATASOURCE_PASSWORD` / `DB_PASSWORD` (default `postgres`). Starting the app requires a running PostgreSQL on 5432 or a `SPRING_DATASOURCE_URL` pointing elsewhere. Tests are unaffected — they run on H2 (`src/test/resources/application.yaml`).
 
-```powershell
-[Environment]::SetEnvironmentVariable('DB_PASSWORD','<password>','User')
-```
-
-Update the URL if pointing at a different SQL Server instance. Tests are unaffected (they run on H2, see `src/test/resources/application.yaml`).
+History note: the project used SQL Server until 2026-07-03 and its old dev credentials remain in git history — see `docs/decisions.md` before publishing this repo.
