@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// 統一的 axios 實例。優先讀取 localStorage 的自訂 API 網址，無設定則預設使用 "/api"
 const getBaseURL = () => {
   let url = localStorage.getItem("minitube_api_url");
   if (url) {
@@ -10,7 +9,8 @@ const getBaseURL = () => {
     }
     return url;
   }
-  return "/api";
+  // 生產環境 (GitHub Pages) 且沒有自訂 URL 時，預設連線本機後端
+  return import.meta.env.PROD ? "http://localhost:8080/api" : "/api";
 };
 
 const http = axios.create({
@@ -44,10 +44,15 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
+    let message =
       error.response?.data?.message ||
       error.message ||
       "發生未知錯誤，請稍後再試";
+
+    // 針對 Mixed Content (HTTPS 前端連 HTTP 後端) 或後端服務未啟動造成的 Network Error 進行引導
+    if (error.message === "Network Error") {
+      message = "無法連線至後端服務。若您使用 GitHub Pages 網址，請確保本地後端服務已啟動，並在瀏覽器設定中允許此網站的「不安全內容 (Insecure content)」以解除混合內容 (Mixed Content) 限制；或請直接在本地使用 http://localhost:5173 開啟網頁進行測試以完全避免此瀏覽器限制。";
+    }
 
     return Promise.reject(new Error(message));
   }

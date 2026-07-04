@@ -1,0 +1,42 @@
+{
+  "effortLevel": "xhigh",
+  "permissions": {
+    "allow": [
+      "PowerShell(Select-String *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Test-NetConnection *)",
+      "PowerShell(Start-Sleep *)",
+      "PowerShell(.\\mvnw.cmd test)",
+      "PowerShell(.\\mvnw.cmd test *)",
+      "PowerShell(.\\mvnw.cmd compile)",
+      "Bash(./mvnw test)",
+      "Bash(./mvnw test *)",
+      "mcp__Claude_Preview__preview_inspect",
+      "mcp__Claude_Preview__preview_logs"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -Command \"$m = Join-Path $env:USERPROFILE '.claude\\projects\\C--Users-qw840-Desktop-mini-youtube\\memory\\MEMORY.md'; if (Test-Path $m) { Write-Output '=== 記憶索引 ==='; Get-Content $m }; Write-Output '=== 最近 commits ==='; git log --oneline -5 2>$null\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -Command \"$s = git status --short 2>$null; if ($s) { Write-Output ('提醒：工作樹有 ' + ($s | Measure-Object).Count + ' 個未提交變更——確認已驗證、是否需要 commit。') }\""
+          }
+        ]
+      }
+    ]
+  }
+}
