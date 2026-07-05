@@ -10,19 +10,25 @@ if ([string]::IsNullOrEmpty($ProjectDir)) {
     $ProjectDir = $PWD.Path
 }
 
-Write-Host "[1/2] Starting backend Spring Boot service (in new window)..." -ForegroundColor Yellow
-Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "`$env:SPRING_PROFILES_ACTIVE='local'; ./mvnw spring-boot:run"
-
+# Load environment variables from .env file into the process environment
 $EnvFile = "$ProjectDir\.env"
 $NgrokToken = ""
 if (Test-Path $EnvFile) {
     $EnvContent = Get-Content $EnvFile
     foreach ($Line in $EnvContent) {
-        if ($Line -match "^NGROK_AUTHTOKEN=(.*)$") {
-            $NgrokToken = $Matches[1].Trim()
+        if ($Line -match "^([^=]+)=(.*)$") {
+            $Key = $Matches[1].Trim()
+            $Val = $Matches[2].Trim()
+            [Environment]::SetEnvironmentVariable($Key, $Val, "Process")
+            if ($Key -eq "NGROK_AUTHTOKEN") {
+                $NgrokToken = $Val
+            }
         }
     }
 }
+
+Write-Host "[1/2] Starting backend Spring Boot service (in new window)..." -ForegroundColor Yellow
+Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "`$env:SPRING_PROFILES_ACTIVE='local'; ./mvnw spring-boot:run"
 
 Write-Host "[2/2] Starting ngrok tunnel service (in new window)..." -ForegroundColor Yellow
 Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "npx ngrok http 8080 --url=denote-reveal-compel.ngrok-free.dev --authtoken=$NgrokToken"
