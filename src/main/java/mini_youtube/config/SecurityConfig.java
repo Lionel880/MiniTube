@@ -51,6 +51,7 @@ public class SecurityConfig {
                 // 詳情與串流維持公開（<video> 標籤無法帶 JWT header，擋掉會讓播放器壞掉），
                 // 拿到連結的人仍可觀看單支影片。
                 .requestMatchers(HttpMethod.GET, "/api/videos/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/api/videos/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
