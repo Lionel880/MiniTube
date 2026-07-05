@@ -175,7 +175,7 @@ onMounted(() => load());
         <div v-else-if="video.status === 'FAILED'" class="transcoding-placeholder failed-placeholder">
           <p>❌ 影片轉碼失敗，請確認檔案格式是否損壞，並重新上傳。</p>
         </div>
-        <video v-else class="video-player" :src="getFullUrl(video.videoUrl)" controls preload="metadata"></video>
+        <video v-else class="video-player" :src="getFullUrl(video.videoUrl)" controls preload="metadata" playsinline webkit-playsinline></video>
       </div>
 
       <div class="video-info-section">
