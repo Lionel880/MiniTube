@@ -18,7 +18,10 @@ import mini_youtube.exception.BusinessException;
 @Service
 public class FileStorageService {
 
-    private static final List<String> ALLOWED_EXTENSIONS = List.of(".mp4", ".webm", ".mov", ".mkv", ".avi");
+    private static final List<String> ALLOWED_EXTENSIONS = List.of(
+            ".mp4", ".webm", ".mov", ".mkv", ".avi",
+            ".flv", ".3gp", ".wmv", ".m4v", ".mpg", ".mpeg"
+    );
 
     private final Path uploadDir;
 

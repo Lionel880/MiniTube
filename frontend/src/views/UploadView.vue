@@ -1,18 +1,20 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { uploadVideo, uploadVideosBatch } from "../api/video";
+import { useUploadStore } from "../store/upload";
 
 const router = useRouter();
+const uploadStore = useUploadStore();
 
 const title = ref("");
 const description = ref("");
 const files = ref([]);
 const errorMessage = ref("");
-const uploading = ref(false);
-const progress = ref(0);
 
-const ALLOWED_EXTENSIONS = [".mp4", ".webm", ".mov", ".mkv", ".avi"];
+const ALLOWED_EXTENSIONS = [
+  ".mp4", ".webm", ".mov", ".mkv", ".avi",
+  ".flv", ".3gp", ".wmv", ".m4v", ".mpg", ".mpeg"
+];
 
 function onFileChange(event) {
   const selectedList = Array.from(event.target.files);
@@ -25,11 +27,19 @@ function onFileChange(event) {
 
   const invalid = selectedList.find((file) => {
     const name = file.name.toLowerCase();
-    return !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
+    const isImageExtension = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp"].some((ext) => name.endsWith(ext));
+    const isImageMime = file.type && file.type.startsWith("image/");
+    return isImageExtension || isImageMime || !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
   });
 
   if (invalid) {
-    errorMessage.value = `檔案「${invalid.name}」格式不支援，僅支援：${ALLOWED_EXTENSIONS.join(", ")}`;
+    const name = invalid.name.toLowerCase();
+    const isImage = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp"].some((ext) => name.endsWith(ext)) || (invalid.type && invalid.type.startsWith("image/"));
+    if (isImage) {
+      errorMessage.value = `檔案「${invalid.name}」為圖片格式。本平台僅供上傳影片檔案，請重新選擇！`;
+    } else {
+      errorMessage.value = `檔案「${invalid.name}」格式不支援，僅支援：${ALLOWED_EXTENSIONS.join(", ")}`;
+    }
     event.target.value = "";
     return;
   }
@@ -44,8 +54,7 @@ function onFileChange(event) {
 }
 
 function onCancel() {
-  // 上傳中不允許直接關閉，避免誤觸中斷
-  if (uploading.value) return;
+  if (uploadStore.isUploading) return;
   router.push({ name: "home" });
 }
 
@@ -57,35 +66,20 @@ async function onSubmit() {
     return;
   }
 
-  uploading.value = true;
-  progress.value = 0;
-
-  try {
-    if (files.value.length === 1) {
-      // 單檔上傳，傳送自訂標題與描述
-      const video = await uploadVideo(
-        { title: title.value, description: description.value, file: files.value[0] },
-        (event) => {
-          if (event.total) {
-            progress.value = Math.round((event.loaded / event.total) * 100);
-          }
-        }
-      );
-      router.push({ name: "video-detail", params: { id: video.id } });
-    } else {
-      // 多檔批量上傳，由後端以檔名當作標題
-      await uploadVideosBatch(files.value, (event) => {
-        if (event.total) {
-          progress.value = Math.round((event.loaded / event.total) * 100);
-        }
-      });
-      router.push({ name: "home" });
-    }
-  } catch (err) {
-    errorMessage.value = err.message;
-  } finally {
-    uploading.value = false;
+  if (files.value.length === 1) {
+    // 單檔背景上傳
+    uploadStore.startUploadSingle({
+      title: title.value,
+      description: description.value,
+      file: files.value[0]
+    });
+  } else {
+    // 多檔背景批量上傳
+    uploadStore.startUploadBatch(files.value);
   }
+
+  // 按下上傳後立刻秒回首頁，讓它在背景慢慢傳
+  router.push({ name: "home" });
 }
 </script>
 
@@ -96,30 +90,32 @@ async function onSubmit() {
         class="close-btn"
         type="button"
         title="關閉"
-        :disabled="uploading"
+        :disabled="uploadStore.isUploading"
         @click="onCancel"
       >
         ✕
       </button>
       <h2>上傳影片</h2>
 
-      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <p v-if="errorMessage || uploadStore.errorMessage" class="error-message">
+        {{ errorMessage || uploadStore.errorMessage }}
+      </p>
 
       <form @submit.prevent="onSubmit">
         <div class="field">
           <label for="file">選擇影片檔案（支援複選批量上傳，單檔上限 3GB）</label>
-          <input id="file" type="file" accept="video/*" multiple @change="onFileChange" :disabled="uploading" required />
+          <input id="file" type="file" accept="video/*" multiple @change="onFileChange" :disabled="uploadStore.isUploading" required />
         </div>
 
         <!-- 只有在單檔上傳時顯示標題與描述輸入欄位 -->
         <template v-if="files.length === 1">
           <div class="field">
             <label for="title">標題（必填，最多 200 字）</label>
-            <input id="title" v-model="title" type="text" maxlength="200" :disabled="uploading" required />
+            <input id="title" v-model="title" type="text" maxlength="200" :disabled="uploadStore.isUploading" required />
           </div>
           <div class="field">
             <label for="description">描述（選填，最多 2000 字）</label>
-            <textarea id="description" v-model="description" maxlength="2000" :disabled="uploading"></textarea>
+            <textarea id="description" v-model="description" maxlength="2000" :disabled="uploadStore.isUploading"></textarea>
           </div>
         </template>
 
@@ -131,17 +127,17 @@ async function onSubmit() {
           </ul>
         </div>
 
-        <div v-if="uploading" class="progress-container">
+        <div v-if="uploadStore.isUploading" class="progress-container">
           <div class="progress-bar">
-            <div class="fill" :style="{ width: progress + '%' }"></div>
+            <div class="fill" :style="{ width: uploadStore.progress + '%' }"></div>
           </div>
-          <span class="progress-text">上傳中... {{ progress }}%</span>
+          <span class="progress-text">上傳中... {{ uploadStore.progress }}%</span>
         </div>
 
         <div class="form-actions">
-          <button class="btn" type="button" :disabled="uploading" @click="onCancel">取消</button>
-          <button class="btn primary" type="submit" :disabled="uploading || files.length === 0">
-            {{ uploading ? `上傳中... ${progress}%` : "開始上傳" }}
+          <button class="btn" type="button" :disabled="uploadStore.isUploading" @click="onCancel">取消</button>
+          <button class="btn primary" type="submit" :disabled="uploadStore.isUploading || files.length === 0">
+            {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : "開始上傳" }}
           </button>
         </div>
       </form>

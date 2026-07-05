@@ -2,6 +2,12 @@
 
 一條一段，新的加在最上面。每條寫清楚：決策、為什麼、影響範圍。
 
+## 2026-07-05 — 修復影片無法播放（Range/206）、轉碼執行緒池、CORS 收斂補套用、NAS 路徑改走 local profile
+
+- **決策**：(1) `VideoController.stream()` 改用 `ResourceRegion` + 手動解析 `HttpRange`，正確回傳 206 Partial Content（原本回傳型別是普通 `Resource`，Spring 不會自動處理 Range，永遠回 200 + 整個檔案）。(2) 新增 `AsyncConfig` 提供有界 `ThreadPoolTaskExecutor`（core 2 / max 4 / queue 50），取代預設無上限的 `SimpleAsyncTaskExecutor`，並記錄 `AsyncUncaughtExceptionHandler`。(3) `TranscodingService` 加上 `@PostConstruct` 記錄 ffmpeg 實際解析路徑，方便診斷轉碼卡住的問題。(4) CORS 的 `https://*.vercel.app` 補套用先前（2026-07-04）就決定要做但實際沒改的收斂，改成 `https://mini-tube*-lionel880s-projects.vercel.app`。(5) 上傳目錄改指向使用者本機 NAS（`\\192.168.0.202\USBshare_2\MiniTubeVideos`），但寫在 `application-local.yaml`（gitignored、透過 `SPRING_PROFILES_ACTIVE=local`，即 `start.ps1` 的方式載入），不是寫回會進 git 的 `application.yaml`。(6) 前端 `HomeView`／`VideoDetailView` 在影片狀態為 `UPLOADING` 時加入背景輪詢（4~5 秒一次，靜默更新不觸發整頁 loading），狀態轉為 `READY`/`FAILED` 後自動停止。(7) `http.js` 的 API base URL 支援建置時 `VITE_API_BASE_URL` 環境變數覆寫，優先序：localStorage 手動設定 > `VITE_API_BASE_URL` > 目前寫死的 ngrok 網址（最後手段）。
+- **為什麼**：使用者回報桌面版上傳後點不進去播放、手機版卡在轉碼中且沒有封面。程式碼複查發現 (1) 是最直接可驗證的根因——iOS Safari 等對 Range/206 要求嚴格的用戶端，收到 200 而非 206 會直接判定不可播放；桌面瀏覽器較寬容但大檔案等同要整支下載完才能播。其餘幾項是複查過程中一併發現、使用者確認「一起做」的周邊加固項目。
+- **影響**：影片播放行為改變（大檔案可以邊下載邊播、可拖曳進度條）。本機下次用 `start.ps1` 啟動時，會自動在 NAS 該路徑下建立資料夾（假設當下 NAS 是可連線、有寫入權限的狀態）；沒有透過 `local` profile 啟動的話（例如純 `./mvnw spring-boot:run` 不帶環境變數），會退回 `application.yaml` 的預設值 `uploads/videos`。CORS 變更後，非 `mini-tube*-lionel880s-projects.vercel.app` 底下的其他 Vercel 網站將無法再帶憑證呼叫本 API；如果有用到其他 preview 網域命名規則，需要再擴充這個 pattern。
+
 ## 2026-07-04 — 全面安全稽核與修復（含 Vercel 部署修正）
 
 - **決策**：執行完整安全稽核，修復 2 項 CRITICAL、3 項 HIGH、6 項 MEDIUM 安全問題。

@@ -38,8 +38,8 @@ import mini_youtube.service.VideoService;
 @RequestMapping("/api/videos")
 public class VideoController {
 
-    private static final long CHUNK_SIZE = 1024 * 1024L; // 1MB
     private static final String ANONYMOUS = "anonymousUser";
+    private static final long DEFAULT_CHUNK_SIZE = 1024 * 1024L; // 1MB，沒有帶 Range 時的預設回傳區塊大小
 
     private final VideoService videoService;
 
@@ -101,8 +101,29 @@ public class VideoController {
         return ResponseEntity.ok().build();
     }
 
+    @DeleteMapping("/all")
+    public ResponseEntity<Void> deleteAll(Authentication authentication) {
+        videoService.deleteAll(authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/cover")
+    public ResponseEntity<UrlResource> getCover(@PathVariable Long id) throws IOException {
+        Path filePath = videoService.resolveVideoCoverPath(id);
+        UrlResource resource = new UrlResource(filePath.toUri());
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .body(resource);
+    }
+
     /**
-     * 影片串流端點，支援 HTTP Range 請求，讓 <video> 標籤可以拖曳進度條。
+     * 影片串流端點，支援 HTTP Range 請求並正確回傳 206 Partial Content。
+     *
+     * 注意：單純把 controller 回傳型別宣告成 Resource/UrlResource 並不會讓 Spring
+     * 自動處理 Range，Spring 只有在回傳型別是 ResourceRegion 時才會啟用
+     * ResourceRegionHttpMessageConverter 去解析用戶端的 Range header。
+     * 沒有真正的 206，iOS Safari 等對 Range 要求嚴格的用戶端會直接判定影片不可播放；
+     * 桌面瀏覽器則是被迫把整支影片下載完才能播，大檔案體驗上就是「點進去播不動」。
      */
     @GetMapping("/{id}/stream")
     public ResponseEntity<ResourceRegion> stream(
@@ -111,21 +132,26 @@ public class VideoController {
 
         Path filePath = videoService.resolveVideoFilePath(id);
         UrlResource videoResource = new UrlResource(filePath.toUri());
-        long contentLength = videoResource.contentLength();
 
+        if (!videoResource.exists() || !videoResource.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        long contentLength = videoResource.contentLength();
         List<HttpRange> ranges = headers.getRange();
+
         ResourceRegion region;
         HttpStatus status;
 
         if (ranges.isEmpty()) {
-            long rangeLength = Math.min(CHUNK_SIZE, contentLength);
+            long rangeLength = Math.min(DEFAULT_CHUNK_SIZE, contentLength);
             region = new ResourceRegion(videoResource, 0, rangeLength);
             status = HttpStatus.OK;
         } else {
             HttpRange range = ranges.get(0);
             long start = range.getRangeStart(contentLength);
             long end = range.getRangeEnd(contentLength);
-            long rangeLength = Math.min(CHUNK_SIZE, end - start + 1);
+            long rangeLength = Math.min(DEFAULT_CHUNK_SIZE, end - start + 1);
             region = new ResourceRegion(videoResource, start, rangeLength);
             status = HttpStatus.PARTIAL_CONTENT;
         }

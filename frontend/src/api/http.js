@@ -1,24 +1,43 @@
 import axios from "axios";
 
-const getBaseURL = () => {
-  let url = localStorage.getItem("minitube_api_url");
-  if (url) {
-    url = url.trim();
-    if (!url.endsWith("/api") && !url.endsWith("/api/")) {
-      url = url.replace(/\/+$/, "") + "/api";
-    }
-    return url;
+/** 統一補上 /api 後綴，避免使用者填網址時漏帶或多帶斜線。 */
+function normalizeApiUrl(rawUrl) {
+  let url = rawUrl.trim();
+  if (!url.endsWith("/api") && !url.endsWith("/api/")) {
+    url = url.replace(/\/+$/, "") + "/api";
   }
-  // 生產環境 (GitHub Pages) 且沒有自訂 URL 時，預設連線本機後端
-  return import.meta.env.PROD ? "http://localhost:8080/api" : "/api";
+  return url;
+}
+
+const getBaseURL = () => {
+  // 優先順序 1：使用者在畫面上手動填過的網址（存在 localStorage，執行期可覆蓋，不用重新建置）
+  const savedUrl = localStorage.getItem("minitube_api_url");
+  if (savedUrl) {
+    return normalizeApiUrl(savedUrl);
+  }
+
+  // 優先順序 2：建置時透過 VITE_API_BASE_URL 指定固定網址（例如正式站網域）。
+  // 用法：在 frontend/.env.local 或部署平台的環境變數設定 VITE_API_BASE_URL=https://your-api-domain
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl) {
+    return normalizeApiUrl(envUrl);
+  }
+
+  // 優先順序 3（最後手段）：目前個人測試用的 ngrok 免費通道網址。
+  // 免費版網址會不定期失效／換新，正式使用請改用上面兩種方式其中一種覆寫。
+  return "https://denote-reveal-compel.ngrok-free.dev/api";
 };
 
 const http = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
-  withCredentials: true, // 啟用跨網域傳遞 Cookie (例如 GitHub Pages -> Render)
+  withCredentials: true, // 啟用跨網域傳遞 Cookie
   headers: {
     "Bypass-Tunnel-Reminder": "true",
+    "ngrok-skip-browser-warning": "69420",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
   },
 });
 

@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import mini_youtube.entity.VideoStatus;
 
 @Data
 @AllArgsConstructor
@@ -22,5 +23,6 @@ public class VideoDetailResponse {
     private String uploaderUsername;
     private long viewCount;
     private Long fileSize;
+    private VideoStatus status;
     private LocalDateTime createdAt;
 }

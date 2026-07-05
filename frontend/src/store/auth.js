@@ -16,9 +16,10 @@ export const useAuthStore = defineStore("auth", {
       const data = await apiLogin(credentials);
 
       // 後端同時回傳 token (body) + 設定 HttpOnly Cookie
-      // 將 token 存入記憶體，供 Authorization header 作為備援使用
+      // 將 token 存入記憶體與 localStorage 作為跨網域備援
       if (data.token) {
         setMemoryToken(data.token);
+        localStorage.setItem("minitube_token", data.token);
       }
 
       // 使用回應中的 username，或退回使用輸入的帳號
@@ -26,17 +27,24 @@ export const useAuthStore = defineStore("auth", {
       localStorage.setItem("username", this.username);
     },
 
-    /** 頁面重新整理時用 Cookie 恢復登入狀態 */
+    /** 頁面重新整理時恢復登入狀態 */
     async restoreSession() {
+      // 先從 localStorage 還原備援 token
+      const savedToken = localStorage.getItem("minitube_token");
+      if (savedToken) {
+        setMemoryToken(savedToken);
+      }
+
       try {
         const me = await fetchMe();
         this.username = me.username;
         localStorage.setItem("username", me.username);
       } catch {
-        // Cookie 已失效，清除本機登入狀態
+        // 憑證已失效，清除本機登入狀態
         this.username = "";
         setMemoryToken("");
         localStorage.removeItem("username");
+        localStorage.removeItem("minitube_token");
       }
     },
 
@@ -53,6 +61,7 @@ export const useAuthStore = defineStore("auth", {
       this.username = "";
       setMemoryToken("");
       localStorage.removeItem("username");
+      localStorage.removeItem("minitube_token");
     },
   },
 });

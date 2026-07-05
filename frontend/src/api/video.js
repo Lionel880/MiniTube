@@ -22,6 +22,7 @@ export function uploadVideo({ title, description, file }, onUploadProgress) {
     .post("/videos/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress,
+      timeout: 0, // 上傳大檔案不設限
     })
     .then((res) => res.data);
 }
@@ -36,6 +37,7 @@ export function uploadVideosBatch(files, onUploadProgress) {
     .post("/videos/upload/batch", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress,
+      timeout: 0, // 批量上傳大檔案不設限
     })
     .then((res) => res.data);
 }
@@ -46,4 +48,8 @@ export function updateVideo(id, { title, description }) {
 
 export function batchDeleteVideos(ids) {
   return http.delete("/videos/batch", { data: ids }).then((res) => res.data);
+}
+
+export function deleteAllVideos() {
+  return http.delete("/videos/all").then((res) => res.data);
 }

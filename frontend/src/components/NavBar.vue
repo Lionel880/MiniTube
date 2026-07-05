@@ -2,10 +2,12 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../store/auth";
+import { useUploadStore } from "../store/upload";
 import axios from "axios";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const uploadStore = useUploadStore();
 const keyword = ref("");
 
 const isModalOpen = ref(false);
@@ -51,7 +53,13 @@ async function testConnection() {
     }
     
     // 發送測試連線至後端 /hello
-    const res = await axios.get(`${cleanUrl}/hello`, { timeout: 5000 });
+    const res = await axios.get(`${cleanUrl}/hello`, {
+      timeout: 5000,
+      headers: {
+        "Bypass-Tunnel-Reminder": "true",
+        "ngrok-skip-browser-warning": "69420"
+      }
+    });
     if (res.status === 200) {
       testStatus.value = "success";
       testMessage.value = "連線成功！伺服器已回應。";
@@ -92,7 +100,20 @@ function clearApiUrl() {
 
 <template>
   <header class="navbar">
-    <RouterLink class="brand" :to="{ name: 'home' }">Mini<span>Tube</span></RouterLink>
+    <div class="brand-group">
+      <RouterLink class="brand" :to="{ name: 'home' }">Mini<span>Tube</span></RouterLink>
+      
+      <!-- 背景上傳微縮指示器 -->
+      <div v-if="uploadStore.isUploading" class="navbar-upload-indicator" @click="router.push({ name: 'upload' })" title="點擊查看上傳詳情">
+        <div class="navbar-spinner"></div>
+        <span class="indicator-text">
+          <span class="text-long">背景上傳中... </span>
+          <span class="text-short">上傳中 </span>
+          {{ uploadStore.progress }}%
+          <span class="text-long"> ({{ uploadStore.filesCount }} 部影片)</span>
+        </span>
+      </div>
+    </div>
 
     <form @submit.prevent="onSearch">
       <input v-model="keyword" type="text" placeholder="搜尋影片" />
@@ -100,7 +121,6 @@ function clearApiUrl() {
     </form>
 
     <div class="nav-actions">
-      <button class="btn" type="button" @click="isModalOpen = true" title="設定 API 伺服器網址">⚙️ 設定 API</button>
       <template v-if="authStore.isLoggedIn">
         <RouterLink class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
         <span class="username-tag">{{ authStore.username }}</span>
@@ -262,5 +282,75 @@ function clearApiUrl() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-upload-indicator {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(62, 166, 255, 0.1);
+  border: 1px solid rgba(62, 166, 255, 0.3);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #3ea6ff;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  animation: pulse 2s infinite ease-in-out;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.navbar-upload-indicator:hover {
+  background: rgba(62, 166, 255, 0.2);
+  border-color: rgba(62, 166, 255, 0.55);
+}
+
+.navbar-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(62, 166, 255, 0.2);
+  border-left-color: #3ea6ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
+}
+
+.text-short {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .text-long {
+    display: none;
+  }
+  .text-short {
+    display: inline;
+  }
+  .navbar-upload-indicator {
+    display: flex;
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background: rgba(18, 18, 18, 0.85);
+    border: 1px solid rgba(62, 166, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    font-size: 13px;
+    border-radius: 30px;
+    backdrop-filter: blur(8px);
+  }
 }
 </style>

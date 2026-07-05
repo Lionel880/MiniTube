@@ -35,6 +35,7 @@ public class VideoService {
     private final VideoRepository videoRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final TranscodingService transcodingService;
 
     @Transactional
     public VideoDetailResponse upload(String username, String title, String description, MultipartFile file) {
@@ -51,17 +52,26 @@ public class VideoService {
         User uploader = getUserOrThrow(username);
         String storedFilename = fileStorageService.store(file);
 
+        String finalTitle = title.trim();
+        if (finalTitle.length() > 190) {
+            finalTitle = finalTitle.substring(0, 190);
+        }
+
         Video video = Video.builder()
-                .title(title.trim())
+                .title(finalTitle)
                 .description(description == null ? "" : description.trim())
                 .filePath(storedFilename)
                 .fileSize(file.getSize())
-                .status(VideoStatus.READY)
+                .status(VideoStatus.UPLOADING)
                 .viewCount(0L)
                 .uploader(uploader)
                 .build();
 
         Video saved = videoRepository.save(video);
+        
+        // 觸發非同步背景轉碼
+        transcodingService.transcodeToMp4(saved.getId(), storedFilename);
+        
         return toDetailResponse(saved, username);
     }
 
@@ -82,17 +92,26 @@ public class VideoService {
 
             String storedFilename = fileStorageService.store(file);
 
+            String finalTitle = title.trim();
+            if (finalTitle.length() > 190) {
+                finalTitle = finalTitle.substring(0, 190);
+            }
+
             Video video = Video.builder()
-                    .title(title)
+                    .title(finalTitle)
                     .description("")
                     .filePath(storedFilename)
                     .fileSize(file.getSize())
-                    .status(VideoStatus.READY)
+                    .status(VideoStatus.UPLOADING)
                     .viewCount(0L)
                     .uploader(uploader)
                     .build();
 
             Video saved = videoRepository.save(video);
+            
+            // 觸發非同步背景轉碼
+            transcodingService.transcodeToMp4(saved.getId(), storedFilename);
+            
             responses.add(toDetailResponse(saved, username));
         }
         return responses;
@@ -152,14 +171,40 @@ public class VideoService {
                 throw new BusinessException("您無權刪除其他人上傳的影片");
             }
             fileStorageService.delete(video.getFilePath());
+            // 安全清理本機的實體封面圖片檔
+            if (video.getCoverUrl() != null && !video.getCoverUrl().isBlank()) {
+                fileStorageService.delete(video.getCoverUrl());
+            }
             videoRepository.delete(video);
         }
+    }
+
+    @Transactional
+    public void deleteAll(String username) {
+        User user = getUserOrThrow(username);
+        List<Video> videos = videoRepository.findByUploader(user);
+        for (Video video : videos) {
+            fileStorageService.delete(video.getFilePath());
+            if (video.getCoverUrl() != null && !video.getCoverUrl().isBlank()) {
+                fileStorageService.delete(video.getCoverUrl());
+            }
+        }
+        videoRepository.deleteAll(videos);
     }
 
     @Transactional(readOnly = true)
     public Path resolveVideoFilePath(Long id) {
         Video video = getVideoOrThrow(id);
         return fileStorageService.resolve(video.getFilePath());
+    }
+
+    @Transactional(readOnly = true)
+    public Path resolveVideoCoverPath(Long id) {
+        Video video = getVideoOrThrow(id);
+        if (video.getCoverUrl() == null || video.getCoverUrl().isBlank()) {
+            throw new BusinessException("該影片尚無封面圖片");
+        }
+        return fileStorageService.resolve(video.getCoverUrl());
     }
 
     private Video getVideoOrThrow(Long id) {
@@ -208,10 +253,11 @@ public class VideoService {
         return VideoSummaryResponse.builder()
                 .id(video.getId())
                 .title(video.getTitle())
-                .coverUrl(video.getCoverUrl())
+                .coverUrl(video.getCoverUrl() == null ? null : "/api/videos/" + video.getId() + "/cover")
                 .uploaderUsername(video.getUploader().getUsername())
                 .viewCount(video.getViewCount())
                 .fileSize(safeFileSize(video))
+                .status(video.getStatus())
                 .createdAt(video.getCreatedAt())
                 .build();
     }
@@ -227,10 +273,11 @@ public class VideoService {
                 .title(video.getTitle())
                 .description(video.getDescription())
                 .videoUrl("/api/videos/" + video.getId() + "/stream")
-                .coverUrl(video.getCoverUrl())
+                .coverUrl(video.getCoverUrl() == null ? null : "/api/videos/" + video.getId() + "/cover")
                 .uploaderUsername(video.getUploader().getUsername())
                 .viewCount(video.getViewCount())
                 .fileSize(safeFileSize(video))
+                .status(video.getStatus())
                 .createdAt(video.getCreatedAt())
                 .build();
     }

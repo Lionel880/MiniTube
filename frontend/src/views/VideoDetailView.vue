@@ -1,8 +1,11 @@
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getVideo, updateVideo } from "../api/video";
 import { useAuthStore } from "../store/auth";
+
+// 影片狀態為 UPLOADING（背景轉碼中）時，多久自動重新查詢一次狀態
+const STATUS_POLL_INTERVAL_MS = 4000;
 
 const props = defineProps({
   id: { type: [String, Number], required: true },
@@ -11,6 +14,20 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+import http from "../api/http";
+
+const getFullUrl = (relativeUrl) => {
+  if (!relativeUrl) return "";
+  let url = relativeUrl;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    const domain = http.defaults.baseURL.replace(/\/api\/?$/, "");
+    url = domain + relativeUrl;
+  }
+  if (url.includes("ngrok-free.dev")) {
+    url += url.includes("?") ? "&ngrok-skip-browser-warning=true" : "?ngrok-skip-browser-warning=true";
+  }
+  return url;
+};
 
 const video = ref(null);
 const loading = ref(false);
@@ -67,17 +84,50 @@ async function saveEdit() {
   }
 }
 
-async function load() {
-  loading.value = true;
-  errorMessage.value = "";
+/**
+ * silent=true 用於背景輪詢：只更新資料，不切換 loading 狀態，
+ * 避免畫面每隔幾秒就整個閃回「載入中...」蓋掉正在顯示的影片區塊。
+ */
+async function load(silent = false) {
+  if (!silent) {
+    loading.value = true;
+    errorMessage.value = "";
+  }
   try {
     video.value = await getVideo(props.id);
   } catch (err) {
-    errorMessage.value = err.message;
+    if (!silent) {
+      errorMessage.value = err.message;
+    }
+    // 背景輪詢失敗就靜默略過，下一次輪詢還會再試，不用打斷使用者
   } finally {
-    loading.value = false;
+    if (!silent) {
+      loading.value = false;
+    }
+  }
+  syncPolling();
+}
+
+let pollTimer = null;
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 }
+
+/** 根據目前影片狀態決定要不要繼續/開始輪詢：只有 UPLOADING（轉碼中）才需要。 */
+function syncPolling() {
+  const shouldPoll = video.value && video.value.status === "UPLOADING";
+  if (shouldPoll && !pollTimer) {
+    pollTimer = setInterval(() => load(true), STATUS_POLL_INTERVAL_MS);
+  } else if (!shouldPoll) {
+    stopPolling();
+  }
+}
+
+onUnmounted(stopPolling);
 
 function formatDate(value) {
   if (!value) return "";
@@ -99,8 +149,12 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-watch(() => props.id, load);
-onMounted(load);
+watch(() => props.id, () => {
+  // 切換到別支影片時，先停掉舊影片的輪詢，避免同時輪詢兩支影片
+  stopPolling();
+  load();
+});
+onMounted(() => load());
 </script>
 
 <template>
@@ -113,7 +167,15 @@ onMounted(load);
 
     <div v-else-if="video" class="video-detail-layout glass-card">
       <div class="video-player-container">
-        <video class="video-player" :src="video.videoUrl" controls preload="metadata"></video>
+        <div v-if="video.status === 'UPLOADING'" class="transcoding-placeholder">
+          <div class="spinner"></div>
+          <p>影片正在背景轉碼中，請稍候再試...</p>
+          <button class="btn primary refresh-status-btn" type="button" @click="load()">🔄 重整狀態</button>
+        </div>
+        <div v-else-if="video.status === 'FAILED'" class="transcoding-placeholder failed-placeholder">
+          <p>❌ 影片轉碼失敗，請確認檔案格式是否損壞，並重新上傳。</p>
+        </div>
+        <video v-else class="video-player" :src="getFullUrl(video.videoUrl)" controls preload="metadata"></video>
       </div>
 
       <div class="video-info-section">
@@ -169,6 +231,41 @@ onMounted(load);
 </template>
 
 <style scoped>
+.transcoding-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16/9;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  gap: 16px;
+  border-radius: 8px;
+  text-align: center;
+  padding: 20px;
+  box-sizing: border-box;
+  backdrop-filter: blur(4px);
+}
+.failed-placeholder {
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #f87171;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.refresh-status-btn {
+  font-size: 14px;
+  padding: 8px 16px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .back-btn {
   margin-bottom: 20px;
 }

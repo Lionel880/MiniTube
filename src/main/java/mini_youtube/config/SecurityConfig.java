@@ -43,7 +43,7 @@ public class SecurityConfig {
                 // 因為 Spring Security 會採用第一個相符的規則。
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers(
-                    "/hello",
+                    "/api/hello",
                     "/api/auth/**"
                 ).permitAll()
                 // 影片跟著使用者走：列表與搜尋只回傳自己的影片，必須登入。
@@ -64,6 +64,9 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "https://frontend-sandy-gamma-14.vercel.app",
+            // 收斂萬用字元：原本的 https://*.vercel.app 會讓任何 vercel.app 網站都能帶憑證呼叫本 API，
+            // 改成只放行自己專案的 preview 部署網域（見 docs/decisions.md 2026-07-04 的決策，此前未真正套用）。
             "https://mini-tube*-lionel880s-projects.vercel.app",
             "https://lionel880.github.io"
         ));
