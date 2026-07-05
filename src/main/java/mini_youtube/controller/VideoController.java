@@ -144,8 +144,7 @@ public class VideoController {
         HttpStatus status;
 
         if (ranges.isEmpty()) {
-            long rangeLength = Math.min(DEFAULT_CHUNK_SIZE, contentLength);
-            region = new ResourceRegion(videoResource, 0, rangeLength);
+            region = new ResourceRegion(videoResource, 0, contentLength);
             status = HttpStatus.OK;
         } else {
             HttpRange range = ranges.get(0);

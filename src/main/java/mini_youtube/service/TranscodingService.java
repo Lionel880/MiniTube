@@ -92,16 +92,34 @@ public class TranscodingService {
             String format = mediaObject.getInfo().getFormat();
             log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}", format, videoCodec);
 
-            // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接使用原始檔案，跳過昂貴的轉碼過程
+            // 檢查如果已經是 h264 編碼且封裝是 mp4，我們只需執行非常快速的 faststart 重新封裝，即可跳過昂貴的完整轉碼，且仍能支援 iOS Safari 播放
             if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
-                log.info("影片已是標準 H.264 MP4 格式，跳過轉碼直接啟用");
-                String coverFilename = generateCover(sourcePath);
-                if (coverFilename != null) {
-                    video.setCoverUrl(coverFilename);
+                log.info("影片已是 H.264 MP4 格式，執行快速 repack 以將 moov atom 移至檔案最前部 (faststart)...");
+                boolean faststartSuccess = runFaststartCommand(sourcePath, targetPath);
+                if (faststartSuccess) {
+                    log.info("Faststart 重新封裝成功！檔案大小: {} bytes", target.length());
+                    String coverFilename = generateCover(targetPath);
+                    if (coverFilename != null) {
+                        video.setCoverUrl(coverFilename);
+                    }
+                    video.setFilePath(newStoredFilename);
+                    video.setFileSize(target.length());
+                    video.setStatus(VideoStatus.READY);
+                    videoRepository.save(video);
+                    
+                    // 刪除原始上傳的檔案 (因為移到了 target)
+                    if (!storedFilename.equals(newStoredFilename)) {
+                        try {
+                            Files.deleteIfExists(sourcePath);
+                            log.info("成功清理原始影片檔案: {}", storedFilename);
+                        } catch (IOException e) {
+                            log.warn("清理原始檔案失敗: {}", storedFilename, e);
+                        }
+                    }
+                    return;
+                } else {
+                    log.warn("Faststart 重新封裝失敗，將降級為完整轉碼流程...");
                 }
-                video.setStatus(VideoStatus.READY);
-                videoRepository.save(video);
-                return;
             }
 
             log.info("正在執行 FFmpeg 轉碼 (目標檔名: {})...", newStoredFilename);
@@ -156,6 +174,7 @@ public class TranscodingService {
                 "-level", "3.1",
                 "-c:a", "aac",
                 "-b:a", "128k",
+                "-movflags", "+faststart",
                 targetPath.toAbsolutePath().toString()
             );
             
@@ -175,6 +194,40 @@ public class TranscodingService {
             return exitCode == 0;
         } catch (Exception e) {
             log.error("執行影片轉碼命令發生異常", e);
+        }
+        return false;
+    }
+
+    private boolean runFaststartCommand(Path sourcePath, Path targetPath) {
+        try {
+            ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator locator = new ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator();
+            String ffmpegPath = locator.getExecutablePath();
+            
+            ProcessBuilder pb = new ProcessBuilder(
+                ffmpegPath,
+                "-y",
+                "-i", sourcePath.toAbsolutePath().toString(),
+                "-c", "copy",
+                "-map", "0",
+                "-movflags", "+faststart",
+                targetPath.toAbsolutePath().toString()
+            );
+            
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                while (reader.readLine() != null) {
+                    // 靜默消耗
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            log.info("FFmpeg Faststart 進程退出，退出碼: {}", exitCode);
+            return exitCode == 0;
+        } catch (Exception e) {
+            log.error("執行影片 Faststart 命令發生異常", e);
         }
         return false;
     }
