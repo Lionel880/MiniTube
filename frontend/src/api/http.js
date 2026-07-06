@@ -23,9 +23,18 @@ const getBaseURL = () => {
     return normalizeApiUrl(envUrl);
   }
 
-  // 優先順序 3（最後手段）：目前個人測試用的 ngrok 免費通道網址。
-  // 免費版網址會不定期失效／換新，正式使用請改用上面兩種方式其中一種覆寫。
-  return "https://denote-reveal-compel.ngrok-free.dev/api";
+  // 優先順序 3（動態同源）：如果不是在本地前端開發環境（localhost:5173），
+  // 自動使用目前訪問的網域作為 API 網址，以支援 Cloudflare/Tunnelmole/內網IP 直接連線。
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // 如果是 Vercel 部署環境，預設連線到無警告頁面且支援分片的 Cloudflare 穿透網址
+    if (window.location.hostname.includes("vercel.app")) {
+      return "https://album-matter-satisfy-phones.trycloudflare.com/api";
+    }
+    return window.location.origin + "/api";
+  }
+
+  // 優先順序 4（最後手段）：目前個人測試用的 Cloudflare 免費通道網址。
+  return "https://album-matter-satisfy-phones.trycloudflare.com/api";
 };
 
 const http = axios.create({
