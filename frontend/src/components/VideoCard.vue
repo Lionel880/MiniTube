@@ -35,7 +35,10 @@ async function loadCover() {
     return;
   }
   try {
-    const response = await http.get(props.video.coverUrl, { responseType: "blob" });
+    const cleanUrl = props.video.coverUrl.startsWith("/api/")
+      ? props.video.coverUrl.substring(4)
+      : props.video.coverUrl;
+    const response = await http.get(cleanUrl, { responseType: "blob" });
     coverBlobUrl.value = URL.createObjectURL(response.data);
   } catch (e) {
     // 抓封面失敗就顯示預設縮圖佔位，不用把整張卡片弄壞

@@ -125,7 +125,7 @@ public class VideoController {
      * 沒有真正的 206，iOS Safari 等對 Range 要求嚴格的用戶端會直接判定影片不可播放；
      * 桌面瀏覽器則是被迫把整支影片下載完才能播，大檔案體驗上就是「點進去播不動」。
      */
-    @GetMapping("/{id}/stream")
+    @GetMapping("/{id}/stream/video.mp4")
     public ResponseEntity<ResourceRegion> stream(
             @PathVariable Long id,
             @RequestHeader HttpHeaders headers) throws IOException {

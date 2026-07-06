@@ -24,14 +24,21 @@ public class FileStorageService {
     );
 
     private final Path uploadDir;
+    private final Path coversDir;
 
     public FileStorageService(@Value("${app.upload-dir:uploads/videos}") String uploadDirProperty) {
         this.uploadDir = Paths.get(uploadDirProperty).toAbsolutePath().normalize();
+        this.coversDir = this.uploadDir.resolve("covers").normalize();
         try {
             Files.createDirectories(this.uploadDir);
+            Files.createDirectories(this.coversDir);
         } catch (IOException e) {
-            throw new BusinessException("無法建立影片儲存目錄", e);
+            throw new BusinessException("無法建立影片儲存目錄或封面目錄", e);
         }
+    }
+
+    public Path getCoversDir() {
+        return this.coversDir;
     }
 
     /**

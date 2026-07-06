@@ -272,7 +272,7 @@ public class VideoService {
                 .id(video.getId())
                 .title(video.getTitle())
                 .description(video.getDescription())
-                .videoUrl("/api/videos/" + video.getId() + "/stream")
+                .videoUrl("/api/videos/" + video.getId() + "/stream/video.mp4")
                 .coverUrl(video.getCoverUrl() == null ? null : "/api/videos/" + video.getId() + "/cover")
                 .uploaderUsername(video.getUploader().getUsername())
                 .viewCount(video.getViewCount())

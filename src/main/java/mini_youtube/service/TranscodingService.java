@@ -92,15 +92,38 @@ public class TranscodingService {
             String format = mediaObject.getInfo().getFormat();
             log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}", format, videoCodec);
 
-            // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接使用原始檔案，跳過昂貴的轉碼過程
+            // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接進行無損複製並套用 faststart 最佳化，跳過耗時的影像重編碼
             if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
-                log.info("影片已是標準 H.264 MP4 格式，跳過轉碼直接啟用");
-                String coverFilename = generateCover(sourcePath);
-                if (coverFilename != null) {
-                    video.setCoverUrl(coverFilename);
+                log.info("影片已是標準 H.264 MP4 格式，跳過完全轉碼，改用超快速無損串流複製並套用 faststart 最佳化...");
+                
+                boolean faststartSuccess = runFaststartFix(sourcePath, targetPath);
+                if (faststartSuccess && target.exists() && target.length() > 0) {
+                    log.info("無損串流複製成功！新檔案大小: {} bytes", target.length());
+                    String coverFilename = generateCover(targetPath);
+                    if (coverFilename != null) {
+                        video.setCoverUrl(coverFilename);
+                    }
+                    video.setFilePath(newStoredFilename);
+                    video.setFileSize(target.length());
+                    video.setStatus(VideoStatus.READY);
+                    videoRepository.save(video);
+                    
+                    // 刪除原始上傳的檔案
+                    try {
+                        Files.deleteIfExists(sourcePath);
+                        log.info("成功清理原始影片檔案: {}", storedFilename);
+                    } catch (IOException e) {
+                        log.warn("清理原始檔案失敗: {}", storedFilename, e);
+                    }
+                } else {
+                    log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
+                    String coverFilename = generateCover(sourcePath);
+                    if (coverFilename != null) {
+                        video.setCoverUrl(coverFilename);
+                    }
+                    video.setStatus(VideoStatus.READY);
+                    videoRepository.save(video);
                 }
-                video.setStatus(VideoStatus.READY);
-                videoRepository.save(video);
                 return;
             }
 
@@ -154,6 +177,7 @@ public class TranscodingService {
                 "-pix_fmt", "yuv420p",
                 "-profile:v", "high",
                 "-level", "3.1",
+                "-movflags", "faststart",
                 "-c:a", "aac",
                 "-b:a", "128k",
                 targetPath.toAbsolutePath().toString()
@@ -181,7 +205,7 @@ public class TranscodingService {
 
     private String generateCover(Path videoPath) {
         String coverFilename = UUID.randomUUID().toString() + ".jpg";
-        Path coverPath = videoPath.getParent().resolve(coverFilename);
+        Path coverPath = fileStorageService.getCoversDir().resolve(coverFilename);
         
         try {
             String ffmpegPath;
@@ -213,8 +237,9 @@ public class TranscodingService {
             
             int exitCode = process.waitFor();
             if (exitCode == 0) {
-                log.info("影片封面截圖生成成功: {}", coverFilename);
-                return coverFilename;
+                String dbCoverPath = "covers/" + coverFilename;
+                log.info("影片封面截圖生成成功: {}", dbCoverPath);
+                return dbCoverPath;
             } else {
                 log.error("影片封面截圖生成失敗，FFmpeg 退出碼: {}", exitCode);
             }
@@ -227,5 +252,71 @@ public class TranscodingService {
     private void updateStatus(Video video, VideoStatus status) {
         video.setStatus(status);
         videoRepository.save(video);
+    }
+
+    @PostConstruct
+    public void fixExistingVideos() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                log.info("開始自動修復所有現有影片的 Faststart 格式...");
+                for (Video video : videoRepository.findAll()) {
+                    if (video.getStatus() == VideoStatus.READY && video.getFilePath() != null) {
+                        try {
+                            Path filePath = fileStorageService.resolve(video.getFilePath());
+                            Path tempPath = filePath.getParent().resolve(video.getFilePath() + "_temp.mp4");
+                            
+                            log.info("正在檢測/修復影片 ID: {}, 路徑: {}", video.getId(), filePath);
+                            boolean success = runFaststartFix(filePath, tempPath);
+                            if (success && Files.exists(tempPath) && Files.size(tempPath) > 0) {
+                                Files.move(tempPath, filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                log.info("影片 ID: {} 修復 Faststart 成功！", video.getId());
+                            } else {
+                                log.info("影片 ID: {} 不需要修復或修復跳過", video.getId());
+                                Files.deleteIfExists(tempPath);
+                            }
+                        } catch (Exception ex) {
+                            log.error("修復影片 ID: {} 發生錯誤", video.getId(), ex);
+                        }
+                    }
+                }
+                log.info("現有影片 Faststart 修復流程結束。");
+            } catch (Exception e) {
+                log.error("修復任務啟動失敗", e);
+            }
+        }).start();
+    }
+
+    private boolean runFaststartFix(Path sourcePath, Path targetPath) {
+        try {
+            String ffmpegPath;
+            synchronized (lock) {
+                ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator locator = new ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator();
+                ffmpegPath = locator.getExecutablePath();
+            }
+            
+            ProcessBuilder pb = new ProcessBuilder(
+                ffmpegPath,
+                "-y",
+                "-i", sourcePath.toAbsolutePath().toString(),
+                "-c", "copy",
+                "-movflags", "faststart",
+                targetPath.toAbsolutePath().toString()
+            );
+            
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                while (reader.readLine() != null) {}
+            }
+            
+            int exitCode = process.waitFor();
+            return exitCode == 0;
+        } catch (Exception e) {
+            log.error("執行 faststart 修復命令失敗", e);
+        }
+        return false;
     }
 }
