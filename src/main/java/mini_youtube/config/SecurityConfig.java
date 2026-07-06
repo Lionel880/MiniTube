@@ -61,15 +61,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://frontend-sandy-gamma-14.vercel.app",
-            "https://mini-tube*-lionel880s-projects.vercel.app",
-            "https://mini-tube-ivpv.vercel.app",
-            "https://mini-tube-ivpv-*.vercel.app",
-            "https://lionel880.github.io"
-        ));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
