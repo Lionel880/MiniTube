@@ -170,7 +170,7 @@ onMounted(() => {
   <div class="page">
     <!-- 未登入時不顯示任何影片，提示先登入 -->
     <div v-if="!authStore.isLoggedIn" class="login-prompt">
-      <p>影片跟著帳號走，請先登入才能查看與管理你上傳的影片。</p>
+      <p>登入查看與管理你上傳的影片。</p>
       <RouterLink class="btn primary" :to="{ name: 'login' }">前往登入</RouterLink>
     </div>
 

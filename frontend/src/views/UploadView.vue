@@ -103,7 +103,7 @@ async function onSubmit() {
 
       <form @submit.prevent="onSubmit">
         <div class="field">
-          <label for="file">選擇影片檔案（支援複選批量上傳，單檔上限 3GB）</label>
+          <label for="file">選擇影片檔案</label>
           <input id="file" type="file" accept="video/*" multiple @change="onFileChange" :disabled="uploadStore.isUploading" required />
         </div>
 
