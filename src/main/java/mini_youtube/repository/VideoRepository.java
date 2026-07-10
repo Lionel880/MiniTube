@@ -13,6 +13,10 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
 
     Page<Video> findByUploaderUsername(String username, Pageable pageable);
 
+    Page<Video> findByUploaderUsernameAndFolderId(String username, Long folderId, Pageable pageable);
+
+    Page<Video> findByUploaderUsernameAndFolderIsNull(String username, Pageable pageable);
+
     java.util.List<Video> findByUploader(User uploader);
 
     @Query("""
@@ -25,4 +29,33 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
             @Param("username") String username,
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    @Query("""
+            select v from Video v
+            where v.uploader.username = :username
+              and v.folder.id = :folderId
+              and (lower(v.title) like lower(concat('%', :keyword, '%'))
+                   or lower(v.description) like lower(concat('%', :keyword, '%')))
+            """)
+    Page<Video> searchByUploaderAndFolder(
+            @Param("username") String username,
+            @Param("keyword") String keyword,
+            @Param("folderId") Long folderId,
+            Pageable pageable);
+
+    @Query("""
+            select v from Video v
+            where v.uploader.username = :username
+              and v.folder is null
+              and (lower(v.title) like lower(concat('%', :keyword, '%'))
+                   or lower(v.description) like lower(concat('%', :keyword, '%')))
+            """)
+    Page<Video> searchByUploaderAndFolderIsNull(
+            @Param("username") String username,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("update Video v set v.folder = null where v.folder.id = :folderId")
+    void detachFolder(@Param("folderId") Long folderId);
 }

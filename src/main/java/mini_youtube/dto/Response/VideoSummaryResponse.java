@@ -22,4 +22,6 @@ public class VideoSummaryResponse {
     private Long fileSize;
     private VideoStatus status;
     private LocalDateTime createdAt;
+    private Long folderId;
+    private String folderName;
 }

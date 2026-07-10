@@ -1,11 +1,11 @@
 import http from "./http";
 
-export function listVideos({ page = 0, size = 12, sortBy = "createdAt", sortDir = "desc" } = {}) {
-  return http.get("/videos", { params: { page, size, sortBy, sortDir } }).then((res) => res.data);
+export function listVideos({ folderId = "", page = 0, size = 12, sortBy = "createdAt", sortDir = "desc" } = {}) {
+  return http.get("/videos", { params: { folderId, page, size, sortBy, sortDir } }).then((res) => res.data);
 }
 
-export function searchVideos({ q, page = 0, size = 12, sortBy = "createdAt", sortDir = "desc" }) {
-  return http.get("/videos/search", { params: { q, page, size, sortBy, sortDir } }).then((res) => res.data);
+export function searchVideos({ q, folderId = "", page = 0, size = 12, sortBy = "createdAt", sortDir = "desc" }) {
+  return http.get("/videos/search", { params: { q, folderId, page, size, sortBy, sortDir } }).then((res) => res.data);
 }
 
 export function getVideo(id) {

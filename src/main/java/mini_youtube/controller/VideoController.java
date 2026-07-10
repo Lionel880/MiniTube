@@ -62,22 +62,24 @@ public class VideoController {
     @GetMapping
     public VideoListResponse list(
             Authentication authentication,
+            @RequestParam(value = "folderId", required = false) String folderId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-        return videoService.list(authentication.getName(), page, size, sortBy, sortDir);
+        return videoService.list(authentication.getName(), folderId, page, size, sortBy, sortDir);
     }
 
     @GetMapping("/search")
     public VideoListResponse search(
             Authentication authentication,
             @RequestParam("q") String keyword,
+            @RequestParam(value = "folderId", required = false) String folderId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-        return videoService.search(authentication.getName(), keyword, page, size, sortBy, sortDir);
+        return videoService.search(authentication.getName(), folderId, keyword, page, size, sortBy, sortDir);
     }
 
     @PutMapping("/{id}")
@@ -86,6 +88,14 @@ public class VideoController {
             @Valid @RequestBody UpdateVideoRequest request,
             Authentication authentication) {
         return videoService.update(id, authentication.getName(), request);
+    }
+
+    @PutMapping("/{id}/folder")
+    public VideoDetailResponse moveVideoToFolder(
+            @PathVariable Long id,
+            @RequestParam(value = "folderId", required = false) Long folderId,
+            Authentication authentication) {
+        return videoService.moveVideoToFolder(id, authentication.getName(), folderId);
     }
 
     @GetMapping("/{id}")

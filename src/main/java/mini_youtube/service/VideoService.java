@@ -19,9 +19,11 @@ import mini_youtube.dto.Request.UpdateVideoRequest;
 import mini_youtube.dto.Response.VideoDetailResponse;
 import mini_youtube.dto.Response.VideoListResponse;
 import mini_youtube.dto.Response.VideoSummaryResponse;
+import mini_youtube.entity.Folder;
 import mini_youtube.entity.User;
 import mini_youtube.entity.Video;
 import mini_youtube.entity.VideoStatus;
+import mini_youtube.repository.FolderRepository;
 import mini_youtube.repository.UserRepository;
 import mini_youtube.repository.VideoRepository;
 
@@ -34,6 +36,7 @@ public class VideoService {
 
     private final VideoRepository videoRepository;
     private final UserRepository userRepository;
+    private final FolderRepository folderRepository;
     private final FileStorageService fileStorageService;
     private final TranscodingService transcodingService;
 
@@ -117,23 +120,45 @@ public class VideoService {
         return responses;
     }
 
-    /** 影片跟著使用者走：列表只回傳目前登入者自己上傳的影片。 */
+    /** 影片跟著使用者走：列表只回傳目前登入者自己上傳的影片，支援資料夾過濾。 */
     @Transactional(readOnly = true)
-    public VideoListResponse list(String username, int page, int size, String sortBy, String sortDir) {
+    public VideoListResponse list(String username, String folderId, int page, int size, String sortBy, String sortDir) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), clampSize(size), getSort(sortBy, sortDir));
-        Page<Video> result = videoRepository.findByUploaderUsername(username, pageable);
+        Page<Video> result;
+        if ("root".equalsIgnoreCase(folderId)) {
+            result = videoRepository.findByUploaderUsernameAndFolderIsNull(username, pageable);
+        } else if (folderId != null && !folderId.isBlank()) {
+            try {
+                result = videoRepository.findByUploaderUsernameAndFolderId(username, Long.parseLong(folderId), pageable);
+            } catch (NumberFormatException e) {
+                result = videoRepository.findByUploaderUsername(username, pageable);
+            }
+        } else {
+            result = videoRepository.findByUploaderUsername(username, pageable);
+        }
         return toListResponse(result);
     }
 
-    /** 搜尋範圍同樣限定在目前登入者自己的影片。 */
+    /** 搜尋範圍同樣限定在目前登入者自己的影片，支援資料夾過濾。 */
     @Transactional(readOnly = true)
-    public VideoListResponse search(String username, String keyword, int page, int size, String sortBy, String sortDir) {
+    public VideoListResponse search(String username, String folderId, String keyword, int page, int size, String sortBy, String sortDir) {
         String safeKeyword = keyword == null ? "" : keyword.trim();
         if (safeKeyword.length() > 200) {
             safeKeyword = safeKeyword.substring(0, 200);
         }
         Pageable pageable = PageRequest.of(Math.max(page, 0), clampSize(size), getSort(sortBy, sortDir));
-        Page<Video> result = videoRepository.searchByUploader(username, safeKeyword, pageable);
+        Page<Video> result;
+        if ("root".equalsIgnoreCase(folderId)) {
+            result = videoRepository.searchByUploaderAndFolderIsNull(username, safeKeyword, pageable);
+        } else if (folderId != null && !folderId.isBlank()) {
+            try {
+                result = videoRepository.searchByUploaderAndFolder(username, safeKeyword, Long.parseLong(folderId), pageable);
+            } catch (NumberFormatException e) {
+                result = videoRepository.searchByUploader(username, safeKeyword, pageable);
+            }
+        } else {
+            result = videoRepository.searchByUploader(username, safeKeyword, pageable);
+        }
         return toListResponse(result);
     }
 
@@ -207,6 +232,30 @@ public class VideoService {
         return fileStorageService.resolve(video.getCoverUrl());
     }
 
+    @Transactional
+    public VideoDetailResponse moveVideoToFolder(Long id, String username, Long folderId) {
+        Video video = getVideoOrThrow(id);
+        User user = getUserOrThrow(username);
+
+        if (!video.getUploader().getId().equals(user.getId())) {
+            throw new BusinessException("您無權編輯此影片");
+        }
+
+        if (folderId != null) {
+            Folder folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new BusinessException("資料夾不存在"));
+            if (!folder.getOwner().getId().equals(user.getId())) {
+                throw new BusinessException("您無權限將影片放入此資料夾");
+            }
+            video.setFolder(folder);
+        } else {
+            video.setFolder(null);
+        }
+
+        Video saved = videoRepository.save(video);
+        return toDetailResponse(saved, username);
+    }
+
     private Video getVideoOrThrow(Long id) {
         return videoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("找不到影片"));
@@ -259,6 +308,8 @@ public class VideoService {
                 .fileSize(safeFileSize(video))
                 .status(video.getStatus())
                 .createdAt(video.getCreatedAt())
+                .folderId(video.getFolder() == null ? null : video.getFolder().getId())
+                .folderName(video.getFolder() == null ? null : video.getFolder().getName())
                 .build();
     }
 
@@ -279,6 +330,8 @@ public class VideoService {
                 .fileSize(safeFileSize(video))
                 .status(video.getStatus())
                 .createdAt(video.getCreatedAt())
+                .folderId(video.getFolder() == null ? null : video.getFolder().getId())
+                .folderName(video.getFolder() == null ? null : video.getFolder().getName())
                 .build();
     }
 }

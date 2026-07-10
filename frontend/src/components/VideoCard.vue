@@ -7,20 +7,14 @@ const props = defineProps({
   video: { type: Object, required: true },
   showCheckbox: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
+  folders: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(["select"]);
+const emit = defineEmits(["select", "refresh"]);
 const router = useRouter();
 
-/**
- * 封面圖片改用 axios 抓成 blob 再轉成 object URL，不再直接把 <img> 的 src
- * 指向 ngrok 網域。原因：ngrok 免費版的瀏覽器警告頁只認得「HTTP 標頭」
- * ngrok-skip-browser-warning，不認網址上的 query string；<img>/<video> 標籤
- * 這種瀏覽器原生資源請求沒辦法帶自訂標頭，所以一律會先撞到 ngrok 的警告頁
- * （回傳 HTML 而不是圖片），導致封面一直讀不出來。axios 這邊已經有帶正確的
- * 標頭（見 http.js），改用 axios 抓圖片就能繞過這個限制。
- */
 const coverBlobUrl = ref("");
+const showDropdown = ref(false);
 
 function releaseCoverBlobUrl() {
   if (coverBlobUrl.value) {
@@ -41,13 +35,37 @@ async function loadCover() {
     const response = await http.get(cleanUrl, { responseType: "blob" });
     coverBlobUrl.value = URL.createObjectURL(response.data);
   } catch (e) {
-    // 抓封面失敗就顯示預設縮圖佔位，不用把整張卡片弄壞
     coverBlobUrl.value = "";
   }
 }
 
-onMounted(loadCover);
-onUnmounted(releaseCoverBlobUrl);
+async function moveToFolder(folderId) {
+  showDropdown.value = false;
+  try {
+    const url = "videos/" + props.video.id + "/folder" + (folderId ? "?folderId=" + folderId : "");
+    await http.put(url);
+    emit("refresh");
+  } catch (err) {
+    alert("移動影片失敗：" + (err.response?.data?.message || err.message));
+  }
+}
+
+function closeDropdown(e) {
+  if (showDropdown.value && !e.target.closest(".folder-move-container")) {
+    showDropdown.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("click", closeDropdown);
+  loadCover();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("click", closeDropdown);
+  releaseCoverBlobUrl();
+});
+
 watch(() => props.video.coverUrl, loadCover);
 
 function goToDetail() {
@@ -99,7 +117,27 @@ function formatSize(bytes) {
       />
     </div>
     <div class="info">
-      <div class="title" :title="video.title">{{ video.title }}</div>
+      <div class="title-row" @click.stop>
+        <div class="title" :title="video.title" @click="goToDetail">{{ video.title }}</div>
+        <div v-if="folders && folders.length" class="folder-move-container">
+          <button class="folder-move-btn" @click="showDropdown = !showDropdown" title="移動到資料夾">
+            📁
+          </button>
+          <div v-if="showDropdown" class="folder-dropdown">
+            <div class="dropdown-item header">移動至資料夾：</div>
+            <div class="dropdown-item" @click="moveToFolder(null)">根目錄 (無)</div>
+            <div
+              v-for="folder in folders"
+              :key="folder.id"
+              class="dropdown-item"
+              :class="{ active: video.folderId === folder.id }"
+              @click="moveToFolder(folder.id)"
+            >
+              {{ folder.name }}
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="meta-uploader">{{ video.uploaderUsername }}</div>
       <div class="meta-stats">
         <span>{{ video.viewCount }} 次觀看</span>
@@ -150,5 +188,78 @@ function formatSize(bytes) {
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.title {
+  flex: 1;
+  cursor: pointer;
+}
+
+.folder-move-container {
+  position: relative;
+}
+
+.folder-move-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: background-color 0.2s;
+}
+
+.folder-move-btn:hover {
+  background-color: var(--border-color);
+}
+
+.folder-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  min-width: 140px;
+  box-shadow: var(--shadow-premium);
+  z-index: 10;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-item:hover {
+  background-color: var(--border-color);
+}
+
+.dropdown-item.header {
+  color: var(--text-muted);
+  cursor: default;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 500;
+}
+
+.dropdown-item.active {
+  color: var(--accent-blue);
+  font-weight: 600;
 }
 </style>
