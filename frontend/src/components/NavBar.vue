@@ -116,8 +116,8 @@ function clearApiUrl() {
       </div>
     </div>
 
-    <!-- 搜尋框 (首頁時隱藏，避免重複) -->
-    <form v-if="route.name !== 'home'" @submit.prevent="onSearch">
+    <!-- 搜尋框 (登入後且非首頁時顯示，避免重複與未登入時顯示) -->
+    <form v-if="authStore.isLoggedIn && route.name !== 'home'" @submit.prevent="onSearch">
       <input v-model="keyword" type="text" placeholder="搜尋影片" />
       <button class="search-btn" type="submit">搜尋</button>
     </form>
