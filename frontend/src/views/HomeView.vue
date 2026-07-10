@@ -14,10 +14,20 @@ const authStore = useAuthStore();
 const uploadStore = useUploadStore();
 const videos = ref([]);
 const folders = ref([]);
+
+// 獨立的資料夾排序狀態
+const folderSortBy = ref(localStorage.getItem("minitube_folder_sort_by") || "createdAt");
+const folderSortDir = ref(localStorage.getItem("minitube_folder_sort_dir") || "desc");
+
+watch([folderSortBy, folderSortDir], () => {
+  localStorage.setItem("minitube_folder_sort_by", folderSortBy.value);
+  localStorage.setItem("minitube_folder_sort_dir", folderSortDir.value);
+});
+
 const sortedFolders = computed(() => {
   const list = [...folders.value];
-  const multiplier = sortDir.value === "asc" ? 1 : -1;
-  if (sortBy.value === "title") {
+  const multiplier = folderSortDir.value === "asc" ? 1 : -1;
+  if (folderSortBy.value === "name") {
     return list.sort((a, b) => a.name.localeCompare(b.name, "zh-TW") * multiplier);
   } else {
     // 預設為建立時間 (createdAt)
@@ -33,7 +43,7 @@ const errorMessage = ref("");
 const currentFolderId = ref(null); // null 代表根目錄，數字代表資料夾 ID
 const currentFolderName = ref("");
 
-// 排序狀態
+// 影片排序狀態
 const sortBy = ref(localStorage.getItem("minitube_sort_by") || "createdAt");
 const sortDir = ref(localStorage.getItem("minitube_sort_dir") || "desc");
 
@@ -298,7 +308,20 @@ function formatDate(value) {
       <!-- 資料夾列表區塊（僅在根目錄顯示） -->
       <div v-if="currentFolderId === null" class="folders-section">
         <div class="section-title-row">
-          <h3 class="section-title">資料夾</h3>
+          <div class="section-left">
+            <h3 class="section-title">資料夾</h3>
+            <div class="folder-sorting">
+              <span class="label">排序依據：</span>
+              <select v-model="folderSortBy" class="select-input">
+                <option value="createdAt">建立時間</option>
+                <option value="name">名稱</option>
+              </select>
+              <select v-model="folderSortDir" class="select-input">
+                <option value="desc">降冪</option>
+                <option value="asc">升冪</option>
+              </select>
+            </div>
+          </div>
           <button class="btn" @click="createFolder">新增資料夾</button>
         </div>
         <div class="folders-grid">
@@ -308,7 +331,11 @@ function formatDate(value) {
             class="folder-card"
             @click="enterFolder(folder)"
           >
-            <div class="folder-icon">資料夾</div>
+            <div class="folder-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="color: #aaa; display: block;">
+                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+              </svg>
+            </div>
             <div class="folder-info">
               <div class="folder-name" :title="folder.name">{{ folder.name }}</div>
               <div class="folder-date">{{ formatDate(folder.createdAt) }}</div>
@@ -578,6 +605,28 @@ function formatDate(value) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.folder-sorting {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.folder-sorting .select-input {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .section-title {
