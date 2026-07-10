@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import mini_youtube.exception.BusinessException;
 import mini_youtube.dto.Request.LoginRequest;
 import mini_youtube.dto.Request.RegisterRequest;
+import mini_youtube.dto.Request.UpdateProfileRequest;
 import mini_youtube.dto.Response.LoginResponse;
 import mini_youtube.dto.Response.RegisterResponse;
+import mini_youtube.dto.Response.UserProfileResponse;
 import mini_youtube.entity.User;
 import mini_youtube.repository.UserRepository;
 import mini_youtube.security.JwtUtil;
@@ -72,5 +74,39 @@ public class UserService implements UserDetailsService {
                 .password(user.getPassword())
                 .authorities("USER")
                 .build();
+    }
+
+    public UserProfileResponse getProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("找不到該使用者"));
+        return new UserProfileResponse(user.getUsername(), user.getEmail());
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("找不到該使用者"));
+
+        // 檢查 Email 是否已被其他人使用
+        if (!user.getEmail().equalsIgnoreCase(request.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BusinessException("該電子信箱已被其他帳號使用");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        // 修改密碼邏輯
+        if (request.getNewPassword() != null && !request.getNewPassword().trim().isEmpty()) {
+            if (request.getOldPassword() == null || request.getOldPassword().isEmpty()) {
+                throw new BusinessException("修改密碼必須輸入舊密碼");
+            }
+            if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+                throw new BusinessException("舊密碼不正確");
+            }
+            user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
+        }
+
+        User saved = userRepository.save(user);
+        return new UserProfileResponse(saved.getUsername(), saved.getEmail());
     }
 }

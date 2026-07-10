@@ -123,7 +123,7 @@ function clearApiUrl() {
     <div class="nav-actions">
       <template v-if="authStore.isLoggedIn">
         <RouterLink class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
-        <span class="username-tag">{{ authStore.username }}</span>
+        <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
         <button class="btn danger" type="button" @click="onLogout">登出</button>
       </template>
       <template v-else>
@@ -271,6 +271,12 @@ function clearApiUrl() {
 .username-tag {
   color: #fff;
   font-weight: bold;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.username-tag:hover {
+  color: var(--accent-blue);
 }
 
 /* 動畫過渡 */

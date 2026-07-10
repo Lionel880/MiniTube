@@ -10,14 +10,42 @@ const title = ref("");
 const description = ref("");
 const files = ref([]);
 const errorMessage = ref("");
+const fileInput = ref(null);
+const isDragOver = ref(false);
 
 const ALLOWED_EXTENSIONS = [
   ".mp4", ".webm", ".mov", ".mkv", ".avi",
   ".flv", ".3gp", ".wmv", ".m4v", ".mpg", ".mpeg"
 ];
 
+function triggerFileInput() {
+  if (uploadStore.isUploading) return;
+  fileInput.value.click();
+}
+
+function onDragOver() {
+  if (uploadStore.isUploading) return;
+  isDragOver.value = true;
+}
+
+function onDragLeave() {
+  isDragOver.value = false;
+}
+
+function onDrop(event) {
+  if (uploadStore.isUploading) return;
+  isDragOver.value = false;
+  const droppedFiles = Array.from(event.dataTransfer.files);
+  processSelectedFiles(droppedFiles);
+}
+
 function onFileChange(event) {
   const selectedList = Array.from(event.target.files);
+  processSelectedFiles(selectedList);
+  event.target.value = ""; // 重設以利重複選取同檔案
+}
+
+function processSelectedFiles(selectedList) {
   errorMessage.value = "";
   files.value = [];
 
@@ -40,7 +68,6 @@ function onFileChange(event) {
     } else {
       errorMessage.value = `檔案「${invalid.name}」格式不支援，僅支援：${ALLOWED_EXTENSIONS.join(", ")}`;
     }
-    event.target.value = "";
     return;
   }
 
@@ -102,9 +129,33 @@ async function onSubmit() {
       </p>
 
       <form @submit.prevent="onSubmit">
-        <div class="field">
-          <label for="file">選擇影片檔案</label>
-          <input id="file" type="file" accept="video/*" multiple @change="onFileChange" :disabled="uploadStore.isUploading" required />
+        <!-- 拖曳上傳框 -->
+        <div 
+          class="drag-drop-zone" 
+          :class="{ dragover: isDragOver }"
+          @dragover.prevent="onDragOver"
+          @dragleave.prevent="onDragLeave"
+          @drop.prevent="onDrop"
+          @click="triggerFileInput"
+        >
+          <input 
+            id="file" 
+            ref="fileInput"
+            type="file" 
+            accept="video/*" 
+            multiple 
+            @change="onFileChange" 
+            :disabled="uploadStore.isUploading" 
+            class="hidden-file-input"
+          />
+          <div class="drag-drop-content">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor" class="upload-icon">
+              <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+            </svg>
+            <p v-if="files.length === 0">拖曳影片檔案至此處，或點擊選擇檔案上傳</p>
+            <p v-else class="selected-text">已選擇 {{ files.length }} 個影片檔案</p>
+            <span class="file-hint">支援 MP4, WebM, MKV, AVI, MOV 等影片格式</span>
+          </div>
         </div>
 
         <!-- 只有在單檔上傳時顯示標題與描述輸入欄位 -->
@@ -170,6 +221,49 @@ async function onSubmit() {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* 拖曳上傳框樣式 */
+.drag-drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  background: rgba(255, 255, 255, 0.01);
+  margin-bottom: 24px;
+}
+.drag-drop-zone:hover, .drag-drop-zone.dragover {
+  border-color: var(--accent-blue);
+  background: rgba(62, 166, 255, 0.04);
+}
+.hidden-file-input {
+  display: none;
+}
+.drag-drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-primary);
+}
+.upload-icon {
+  color: var(--text-secondary);
+  transition: var(--transition-smooth);
+}
+.drag-drop-zone:hover .upload-icon, .drag-drop-zone.dragover .upload-icon {
+  color: var(--accent-blue);
+  transform: translateY(-4px);
+}
+.file-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.selected-text {
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
