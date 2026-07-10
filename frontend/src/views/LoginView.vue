@@ -48,7 +48,7 @@ async function onSubmit() {
     </form>
 
     <p style="margin-top: 16px; color: #aaa">
-      還沒有帳號？<RouterLink to="/register" style="color: #3ea6ff">前往註冊</RouterLink>
+      還沒有帳號？<RouterLink to="/register" style="color: var(--accent-blue)">前往註冊</RouterLink>
     </p>
   </div>
 </template>

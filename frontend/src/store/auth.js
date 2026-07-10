@@ -3,12 +3,15 @@ import { login as apiLogin, register as apiRegister, fetchMe, logout as apiLogou
 import { setMemoryToken } from "../api/http";
 
 export const useAuthStore = defineStore("auth", {
-  state: () => ({
-    username: localStorage.getItem("username") || "",
-  }),
+  state: () => {
+    const savedToken = localStorage.getItem("minitube_token");
+    return {
+      username: savedToken ? (localStorage.getItem("username") || "") : "",
+    };
+  },
 
   getters: {
-    isLoggedIn: (state) => !!state.username,
+    isLoggedIn: (state) => !!state.username && !!localStorage.getItem("minitube_token"),
   },
 
   actions: {
@@ -29,11 +32,14 @@ export const useAuthStore = defineStore("auth", {
 
     /** 頁面重新整理時恢復登入狀態 */
     async restoreSession() {
-      // 先從 localStorage 還原備援 token
       const savedToken = localStorage.getItem("minitube_token");
-      if (savedToken) {
-        setMemoryToken(savedToken);
+      if (!savedToken) {
+        this.username = "";
+        localStorage.removeItem("username");
+        return;
       }
+
+      setMemoryToken(savedToken);
 
       try {
         const me = await fetchMe();

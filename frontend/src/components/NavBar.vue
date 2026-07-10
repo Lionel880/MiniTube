@@ -240,7 +240,7 @@ function clearApiUrl() {
 }
 
 .modal-content input:focus {
-  border-color: #3ea6ff;
+  border-color: var(--accent-blue);
 }
 
 .test-feedback {
@@ -303,12 +303,12 @@ function clearApiUrl() {
   display: none;
   align-items: center;
   gap: 8px;
-  background: rgba(62, 166, 255, 0.1);
-  border: 1px solid rgba(62, 166, 255, 0.3);
+  background: rgba(255, 122, 0, 0.1);
+  border: 1px solid rgba(255, 122, 0, 0.3);
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
-  color: #3ea6ff;
+  color: var(--accent-blue);
   font-weight: 500;
   backdrop-filter: blur(4px);
   animation: pulse 2s infinite ease-in-out;
@@ -317,15 +317,15 @@ function clearApiUrl() {
 }
 
 .navbar-upload-indicator:hover {
-  background: rgba(62, 166, 255, 0.2);
-  border-color: rgba(62, 166, 255, 0.55);
+  background: rgba(255, 122, 0, 0.2);
+  border-color: rgba(255, 122, 0, 0.55);
 }
 
 .navbar-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(62, 166, 255, 0.2);
-  border-left-color: #3ea6ff;
+  border: 2px solid rgba(255, 122, 0, 0.2);
+  border-left-color: var(--accent-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

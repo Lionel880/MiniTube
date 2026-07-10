@@ -205,15 +205,15 @@ main {
 }
 
 .btn.primary {
-  background: #0066cc;
+  background: var(--accent-blue);
   color: #fff;
-  border-color: #0066cc;
+  border-color: var(--accent-blue);
   font-weight: 500;
 }
 
 .btn.primary:hover {
-  background: #0052a3;
-  border-color: #0052a3;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn.danger {

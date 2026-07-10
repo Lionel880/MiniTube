@@ -55,7 +55,7 @@ async function onSubmit() {
     </form>
 
     <p style="margin-top: 16px; color: #aaa">
-      已經有帳號了？<RouterLink to="/login" style="color: #3ea6ff">前往登入</RouterLink>
+      已經有帳號了？<RouterLink to="/login" style="color: var(--accent-blue)">前往登入</RouterLink>
     </p>
   </div>
 </template>
