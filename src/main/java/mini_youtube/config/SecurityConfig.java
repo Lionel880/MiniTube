@@ -39,19 +39,24 @@ public class SecurityConfig {
                 .accessDeniedHandler(restAccessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> auth
-                // /api/auth/me 需要驗證身分，必須寫在 /api/auth/** 這條 permitAll 規則之前，
-                // 因為 Spring Security 會採用第一個相符的規則。
+                // 1. 允許前端靜態資源直接存取
+                .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**", "/static/**").permitAll()
+                // 2. 允許 Vue 頁面路徑直接存取（避免重新整理網頁時報 401）
+                .requestMatchers("/login", "/register", "/upload", "/search", "/videos/**").permitAll()
+                
+                // 3. API 認證規則
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers(
                     "/api/hello",
                     "/api/auth/**"
                 ).permitAll()
-                // 影片跟著使用者走：列表與搜尋只回傳自己的影片，必須登入。
                 .requestMatchers(HttpMethod.GET, "/api/videos", "/api/videos/search").authenticated()
-                // 詳情與串流維持公開（<video> 標籤無法帶 JWT header，擋掉會讓播放器壞掉），
-                // 拿到連結的人仍可觀看單支影片。
                 .requestMatchers(HttpMethod.GET, "/api/videos/**").permitAll()
-                .anyRequest().authenticated()
+                
+                // 4. 所有其他 /api/ 開頭的後端請求皆需要驗證
+                .requestMatchers("/api/**").authenticated()
+                // 5. 其餘非 API 的請求皆允許（如其他前端路由）
+                .anyRequest().permitAll()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
