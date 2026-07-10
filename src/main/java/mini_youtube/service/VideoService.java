@@ -83,10 +83,25 @@ public class VideoService {
 
         Video saved = videoRepository.save(video);
         
-        // 觸發非同步背景轉碼
-        transcodingService.transcodeToMp4(saved.getId(), storedFilename);
+        // 觸發非同步背景轉碼 (待交易提交後，以確保異步執行緒能查到影片)
+        triggerTranscodingAsync(saved.getId(), storedFilename);
         
         return toDetailResponse(saved, username);
+    }
+
+    private void triggerTranscodingAsync(Long videoId, String storedFilename) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        transcodingService.transcodeToMp4(videoId, storedFilename);
+                    }
+                }
+            );
+        } else {
+            transcodingService.transcodeToMp4(videoId, storedFilename);
+        }
     }
 
     @Transactional
@@ -134,8 +149,8 @@ public class VideoService {
 
             Video saved = videoRepository.save(video);
             
-            // 觸發非同步背景轉碼
-            transcodingService.transcodeToMp4(saved.getId(), storedFilename);
+            // 觸發非同步背景轉碼 (待交易提交後)
+            triggerTranscodingAsync(saved.getId(), storedFilename);
             
             responses.add(toDetailResponse(saved, username));
         }

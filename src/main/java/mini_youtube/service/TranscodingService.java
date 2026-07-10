@@ -32,6 +32,7 @@ public class TranscodingService {
     private final VideoRepository videoRepository;
     private final FileStorageService fileStorageService;
     private static final Object lock = new Object();
+    private static final java.util.concurrent.Semaphore transcodeSemaphore = new java.util.concurrent.Semaphore(1);
 
     /**
      * 應用程式啟動時就記錄 ffmpeg 實際解析到的路徑，而不是等使用者上傳影片失敗才發現。
@@ -59,108 +60,122 @@ public class TranscodingService {
     public void transcodeToMp4(Long videoId, String storedFilename) {
         log.info("開始背景轉碼影片 ID: {}, 檔案: {}", videoId, storedFilename);
 
-        Video video = videoRepository.findById(videoId).orElse(null);
-        if (video == null) {
-            log.error("找不到影片 ID: {}, 取消轉碼", videoId);
+        try {
+            // 獲取轉碼信號量，同一時間只允許 1 個影片進行重度轉碼工作以保持系統穩定
+            transcodeSemaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("轉碼任務排隊被中斷: {}", videoId, e);
             return;
         }
 
-        Path sourcePath;
         try {
-            sourcePath = fileStorageService.resolve(storedFilename);
-        } catch (Exception e) {
-            log.error("無法解析影片實體路徑: {}", storedFilename, e);
-            updateStatus(video, VideoStatus.FAILED);
-            return;
-        }
-
-        String newStoredFilename = UUID.randomUUID().toString() + ".mp4";
-        Path targetPath = sourcePath.getParent().resolve(newStoredFilename);
-
-        File source = sourcePath.toFile();
-        File target = targetPath.toFile();
-
-        try {
-            MultimediaObject mediaObject;
-            synchronized (lock) {
-                mediaObject = new MultimediaObject(source);
+            Video video = videoRepository.findById(videoId).orElse(null);
+            if (video == null) {
+                log.error("找不到影片 ID: {}, 取消轉碼", videoId);
+                return;
             }
-            String videoCodec = "";
-            if (mediaObject.getInfo().getVideo() != null) {
-                videoCodec = mediaObject.getInfo().getVideo().getDecoder();
-            }
-            String format = mediaObject.getInfo().getFormat();
-            log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}", format, videoCodec);
 
-            // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接進行無損複製並套用 faststart 最佳化，跳過耗時的影像重編碼
-            if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
-                log.info("影片已是標準 H.264 MP4 格式，跳過完全轉碼，改用超快速無損串流複製並套用 faststart 最佳化...");
-                
-                boolean faststartSuccess = runFaststartFix(sourcePath, targetPath);
-                if (faststartSuccess && target.exists() && target.length() > 0) {
-                    log.info("無損串流複製成功！新檔案大小: {} bytes", target.length());
-                    String coverFilename = generateCover(targetPath);
-                    if (coverFilename != null) {
-                        video.setCoverUrl(coverFilename);
-                    }
-                    video.setFilePath(newStoredFilename);
-                    video.setFileSize(target.length());
-                    video.setStatus(VideoStatus.READY);
-                    videoRepository.save(video);
+            Path sourcePath;
+            try {
+                sourcePath = fileStorageService.resolve(storedFilename);
+            } catch (Exception e) {
+                log.error("無法解析影片實體路徑: {}", storedFilename, e);
+                updateStatus(video, VideoStatus.FAILED);
+                return;
+            }
+
+            String newStoredFilename = UUID.randomUUID().toString() + ".mp4";
+            Path targetPath = sourcePath.getParent().resolve(newStoredFilename);
+
+            File source = sourcePath.toFile();
+            File target = targetPath.toFile();
+
+            try {
+                MultimediaObject mediaObject;
+                synchronized (lock) {
+                    mediaObject = new MultimediaObject(source);
+                }
+                String videoCodec = "";
+                if (mediaObject.getInfo().getVideo() != null) {
+                    videoCodec = mediaObject.getInfo().getVideo().getDecoder();
+                }
+                String format = mediaObject.getInfo().getFormat();
+                log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}", format, videoCodec);
+
+                // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接進行無損複製並套用 faststart 最佳化，跳過耗時的影像重編碼
+                if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
+                    log.info("影片已是標準 H.264 MP4 格式，跳過完全轉碼，改用超快速無損串流複製並套用 faststart 最佳化...");
                     
-                    // 刪除原始上傳的檔案
+                    boolean faststartSuccess = runFaststartFix(sourcePath, targetPath);
+                    if (faststartSuccess && target.exists() && target.length() > 0) {
+                        log.info("無損串流複製成功！新檔案大小: {} bytes", target.length());
+                        String coverFilename = generateCover(targetPath);
+                        if (coverFilename != null) {
+                            video.setCoverUrl(coverFilename);
+                        }
+                        video.setFilePath(newStoredFilename);
+                        video.setFileSize(target.length());
+                        video.setStatus(VideoStatus.READY);
+                        videoRepository.save(video);
+                        
+                        // 刪除原始上傳的檔案
+                        try {
+                            Files.deleteIfExists(sourcePath);
+                            log.info("成功清理原始影片檔案: {}", storedFilename);
+                        } catch (IOException e) {
+                            log.warn("清理原始檔案失敗: {}", storedFilename, e);
+                        }
+                    } else {
+                        log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
+                        String coverFilename = generateCover(sourcePath);
+                        if (coverFilename != null) {
+                            video.setCoverUrl(coverFilename);
+                        }
+                        video.setStatus(VideoStatus.READY);
+                        videoRepository.save(video);
+                    }
+                    return;
+                }
+
+                log.info("正在執行 FFmpeg 轉碼 (目標檔名: {})...", newStoredFilename);
+                boolean transcodeSuccess = runTranscodeCommand(sourcePath, targetPath);
+                if (!transcodeSuccess) {
+                    throw new RuntimeException("FFmpeg 轉碼命令行執行失敗");
+                }
+                log.info("轉碼成功！新檔案大小: {} bytes", target.length());
+
+                // 轉碼成功，更新資料庫資訊
+                String coverFilename = generateCover(targetPath);
+                if (coverFilename != null) {
+                    video.setCoverUrl(coverFilename);
+                }
+                video.setFilePath(newStoredFilename);
+                video.setFileSize(target.length());
+                video.setStatus(VideoStatus.READY);
+                videoRepository.save(video);
+
+                // 刪除原始上傳的檔案 (如果是不同檔案才刪除)
+                if (!storedFilename.equals(newStoredFilename)) {
                     try {
                         Files.deleteIfExists(sourcePath);
                         log.info("成功清理原始影片檔案: {}", storedFilename);
                     } catch (IOException e) {
                         log.warn("清理原始檔案失敗: {}", storedFilename, e);
                     }
-                } else {
-                    log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
-                    String coverFilename = generateCover(sourcePath);
-                    if (coverFilename != null) {
-                        video.setCoverUrl(coverFilename);
-                    }
-                    video.setStatus(VideoStatus.READY);
-                    videoRepository.save(video);
                 }
-                return;
-            }
 
-            log.info("正在執行 FFmpeg 轉碼 (目標檔名: {})...", newStoredFilename);
-            boolean transcodeSuccess = runTranscodeCommand(sourcePath, targetPath);
-            if (!transcodeSuccess) {
-                throw new RuntimeException("FFmpeg 轉碼命令行執行失敗");
-            }
-            log.info("轉碼成功！新檔案大小: {} bytes", target.length());
-
-            // 轉碼成功，更新資料庫資訊
-            String coverFilename = generateCover(targetPath);
-            if (coverFilename != null) {
-                video.setCoverUrl(coverFilename);
-            }
-            video.setFilePath(newStoredFilename);
-            video.setFileSize(target.length());
-            video.setStatus(VideoStatus.READY);
-            videoRepository.save(video);
-
-            // 刪除原始上傳的檔案 (如果是不同檔案才刪除)
-            if (!storedFilename.equals(newStoredFilename)) {
-                try {
-                    Files.deleteIfExists(sourcePath);
-                    log.info("成功清理原始影片檔案: {}", storedFilename);
-                } catch (IOException e) {
-                    log.warn("清理原始檔案失敗: {}", storedFilename, e);
+            } catch (Exception e) {
+                log.error("轉碼失敗，影片 ID: {}", videoId, e);
+                // 轉碼失敗，清理可能產生到一半的殘留檔案
+                if (target.exists()) {
+                    target.delete();
                 }
+                updateStatus(video, VideoStatus.FAILED);
             }
-
-        } catch (Exception e) {
-            log.error("轉碼失敗，影片 ID: {}", videoId, e);
-            // 轉碼失敗，清理可能產生到一半的殘留檔案
-            if (target.exists()) {
-                target.delete();
-            }
-            updateStatus(video, VideoStatus.FAILED);
+        } finally {
+            // 釋放信號量，讓下一個排隊的轉碼任務可以執行
+            transcodeSemaphore.release();
         }
     }
 
