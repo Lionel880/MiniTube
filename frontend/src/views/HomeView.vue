@@ -752,14 +752,14 @@ function formatDate(value) {
 }
 
 .action-btn.primary {
-  background: #0066cc;
+  background: var(--accent-blue);
   color: #fff;
-  border-color: #0066cc;
+  border-color: var(--accent-blue);
 }
 
 .action-btn.primary:hover {
-  background: #0052a3;
-  border-color: #0052a3;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .action-btn.danger {
@@ -785,8 +785,8 @@ function formatDate(value) {
 }
 
 .search-box:focus-within {
-  border-color: #0066cc;
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.15);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(255, 121, 0, 0.15);
 }
 
 .search-icon {
@@ -862,7 +862,7 @@ function formatDate(value) {
 
 .crumb-link {
   cursor: pointer;
-  color: #0066cc;
+  color: var(--accent-blue);
   transition: color 0.15s ease;
 }
 
@@ -906,8 +906,8 @@ function formatDate(value) {
 }
 
 .nav-icon-btn.active {
-  color: #0066cc;
-  background: rgba(0, 102, 204, 0.1);
+  color: var(--accent-blue);
+  background: rgba(255, 121, 0, 0.1);
 }
 
 .view-toggle {
@@ -921,20 +921,20 @@ function formatDate(value) {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #0066cc;
+  color: var(--accent-blue);
   font-weight: 500;
   cursor: pointer;
   padding: 4px 10px;
-  background: rgba(0, 102, 204, 0.08);
+  background: rgba(255, 121, 0, 0.08);
   border-radius: 12px;
-  border: 1px solid rgba(0, 102, 204, 0.2);
+  border: 1px solid rgba(255, 121, 0, 0.2);
 }
 
 .spinner-tiny {
   width: 10px;
   height: 10px;
-  border: 2px solid rgba(0, 102, 204, 0.2);
-  border-left-color: #0066cc;
+  border: 2px solid rgba(255, 121, 0, 0.2);
+  border-left-color: var(--accent-blue);
   border-radius: 50%;
   animation: spin-tiny 0.8s linear infinite;
 }
@@ -949,8 +949,8 @@ function formatDate(value) {
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  background: rgba(0, 102, 204, 0.06);
-  border: 1px solid rgba(0, 102, 204, 0.15);
+  background: rgba(255, 121, 0, 0.06);
+  border: 1px solid rgba(255, 121, 0, 0.15);
   border-radius: 8px;
   margin: 8px 0;
 }
@@ -958,7 +958,7 @@ function formatDate(value) {
 .batch-count {
   font-size: 13px;
   font-weight: 500;
-  color: #0066cc;
+  color: var(--accent-blue);
   margin-right: auto;
 }
 
@@ -1010,7 +1010,7 @@ function formatDate(value) {
 
 .sort-arrow {
   font-size: 11px;
-  color: #0066cc;
+  color: var(--accent-blue);
 }
 
 .col-actions-header {
@@ -1022,7 +1022,7 @@ function formatDate(value) {
 }
 
 .list-row.selected {
-  background: rgba(0, 102, 204, 0.06);
+  background: rgba(255, 121, 0, 0.06);
 }
 
 .col-name {
@@ -1039,11 +1039,11 @@ function formatDate(value) {
 }
 
 .folder-icon-color {
-  color: #f9a825;
+  color: #ff8c00; /* vibrant folder orange */
 }
 
 .video-icon-color {
-  color: #0066cc;
+  color: var(--accent-blue);
 }
 
 .row-name {
@@ -1150,13 +1150,13 @@ function formatDate(value) {
 }
 
 .folder-card:hover {
-  border-color: #0066cc;
-  box-shadow: 0 2px 8px rgba(0, 102, 204, 0.12);
+  border-color: var(--accent-blue);
+  box-shadow: 0 2px 8px rgba(255, 121, 0, 0.12);
 }
 
 .folder-card.selected {
-  border-color: #0066cc;
-  background: rgba(0, 102, 204, 0.05);
+  border-color: var(--accent-blue);
+  background: rgba(255, 121, 0, 0.05);
 }
 
 .folder-card-check {
@@ -1175,7 +1175,7 @@ function formatDate(value) {
 }
 
 .folder-card-icon {
-  color: #f9a825;
+  color: #ff8c00; /* vibrant folder orange */
   flex-shrink: 0;
 }
 
