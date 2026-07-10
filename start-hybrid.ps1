@@ -19,7 +19,6 @@ if (Test-Path $EnvFile) {
         if ($line -and -not $line.StartsWith("#") -and $line -match "^([^=]+)=(.*)$") {
             $key = $Matches[1].Trim()
             $value = $Matches[2].Trim()
-            $env:$key = $value
             [Environment]::SetEnvironmentVariable($key, $value, "Process")
         }
     }
