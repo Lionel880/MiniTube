@@ -55,7 +55,16 @@ if (-not (Test-Path "$ProjectDir\cloudflared.exe")) {
     Write-Host "Downloading cloudflared.exe..." -ForegroundColor Gray
     curl.exe -L -o "$ProjectDir\cloudflared.exe" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 }
-Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "./cloudflared.exe tunnel --url http://localhost:8080"
+
+# Check if Zero Trust Tunnel Token is configured in .env
+$TunnelToken = [Environment]::GetEnvironmentVariable("CLOUDFLARE_TUNNEL_TOKEN")
+if (-not [string]::IsNullOrEmpty($TunnelToken)) {
+    Write-Host "Detected permanent Cloudflare Tunnel Token. Starting Zero Trust Tunnel..." -ForegroundColor Green
+    Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "./cloudflared.exe tunnel --no-autoupdate run --token $TunnelToken"
+} else {
+    Write-Host "No Tunnel Token found in .env. Starting fallback Quick Tunnel (random URL)..." -ForegroundColor Gray
+    Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "./cloudflared.exe tunnel --url http://localhost:8080"
+}
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
