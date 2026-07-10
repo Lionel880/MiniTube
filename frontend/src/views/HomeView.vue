@@ -109,12 +109,16 @@ async function deleteFolder(folder) {
 function enterFolder(folder) {
   currentFolderId.value = folder.id;
   currentFolderName.value = folder.name;
+  sessionStorage.setItem("minitube_active_folder_id", folder.id);
+  sessionStorage.setItem("minitube_active_folder_name", folder.name);
   load(0);
 }
 
 function exitFolder() {
   currentFolderId.value = null;
   currentFolderName.value = "";
+  sessionStorage.removeItem("minitube_active_folder_id");
+  sessionStorage.removeItem("minitube_active_folder_name");
   loadFolders();
   load(0);
 }
@@ -252,17 +256,32 @@ watch(
   }
 );
 
+function restoreFolderState() {
+  const storedFolderId = sessionStorage.getItem("minitube_active_folder_id");
+  const storedFolderName = sessionStorage.getItem("minitube_active_folder_name");
+  if (storedFolderId !== null && storedFolderId !== "null") {
+    currentFolderId.value = Number(storedFolderId);
+    currentFolderName.value = storedFolderName || "";
+  } else {
+    currentFolderId.value = null;
+    currentFolderName.value = "";
+  }
+}
+
 watch(
   () => authStore.isLoggedIn,
   (loggedIn) => {
     if (loggedIn) {
-      currentFolderId.value = null;
-      currentFolderName.value = "";
+      restoreFolderState();
       loadFolders();
       load(0);
     } else {
       videos.value = [];
       folders.value = [];
+      sessionStorage.removeItem("minitube_active_folder_id");
+      sessionStorage.removeItem("minitube_active_folder_name");
+      currentFolderId.value = null;
+      currentFolderName.value = "";
       stopPolling();
     }
   }
@@ -271,6 +290,7 @@ watch(
 onMounted(() => {
   window.addEventListener("click", handleOutsideClick);
   if (authStore.isLoggedIn) {
+    restoreFolderState();
     loadFolders();
     load(0);
   }
