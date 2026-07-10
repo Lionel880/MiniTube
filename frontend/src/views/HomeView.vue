@@ -690,15 +690,17 @@ function formatDate(value) {
                 </svg>
               </div>
               <div class="folder-card-info">
-                <div class="folder-card-name" :title="folder.name">{{ folder.name }}</div>
+                <div class="folder-card-name-row">
+                  <div class="folder-card-name" :title="folder.name">{{ folder.name }}</div>
+                  <button class="folder-edit-inline-btn" @click.stop="editFolder(folder)" title="重新命名">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                    </svg>
+                  </button>
+                </div>
                 <div class="folder-card-date">{{ formatDate(folder.createdAt) }}</div>
               </div>
               <div class="folder-card-actions" @click.stop>
-                <button class="row-action-btn" @click="editFolder(folder)" title="重新命名">
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                  </svg>
-                </button>
                 <button class="row-action-btn delete" @click="deleteFolder(folder)" title="刪除">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -1238,6 +1240,13 @@ function formatDate(value) {
   min-width: 0;
 }
 
+.folder-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
 .folder-card-name {
   font-size: 13px;
   font-weight: 500;
@@ -1245,6 +1254,27 @@ function formatDate(value) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.folder-edit-inline-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+.folder-edit-inline-btn:hover {
+  background: rgba(255, 122, 0, 0.15);
+  color: var(--accent-blue);
 }
 
 .folder-card-date {
@@ -1386,7 +1416,14 @@ function formatDate(value) {
   }
 
   .folder-card-actions {
-    opacity: 1 !important;
+    display: none !important; /* 手機版不顯示資料夾卡片右上角刪除按鈕 */
+  }
+
+  .folder-edit-inline-btn {
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: var(--text-primary) !important;
   }
 
   .action-bar {
