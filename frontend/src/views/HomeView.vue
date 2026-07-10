@@ -551,8 +551,8 @@ function formatDate(value) {
           <div class="col-actions-header"></div>
         </div>
 
-        <!-- 資料夾行（根目錄才顯示） -->
-        <template v-if="currentFolderId === null">
+        <!-- 資料夾行（根目錄才顯示，且搜尋時隱藏） -->
+        <template v-if="currentFolderId === null && !searchKeyword.trim()">
           <div
             v-for="folder in sortedFolders"
             :key="'folder-' + folder.id"
@@ -628,8 +628,8 @@ function formatDate(value) {
 
       <!-- ===== 格狀視圖 ===== -->
       <template v-else>
-        <!-- 資料夾格狀（根目錄才顯示） -->
-        <template v-if="currentFolderId === null && sortedFolders.length > 0">
+        <!-- 資料夾格狀（根目錄才顯示，且搜尋時隱藏） -->
+        <template v-if="currentFolderId === null && !searchKeyword.trim() && sortedFolders.length > 0">
           <div class="section-label">文件夾</div>
           <div class="folders-grid">
             <div
@@ -843,9 +843,11 @@ function formatDate(value) {
   transition: all 0.15s ease;
 }
 
-.nav-back-btn:hover {
-  background: var(--border-color);
-  color: var(--text-primary);
+@media (hover: hover) {
+  .nav-back-btn:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+  }
 }
 
 .nav-separator {
@@ -900,9 +902,11 @@ function formatDate(value) {
   transition: all 0.15s ease;
 }
 
-.nav-icon-btn:hover {
-  background: var(--border-color);
-  color: var(--text-primary);
+@media (hover: hover) {
+  .nav-icon-btn:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+  }
 }
 
 .nav-icon-btn.active {
@@ -1286,6 +1290,11 @@ function formatDate(value) {
   .list-row,
   .list-header {
     grid-template-columns: 1fr 90px;
+  }
+
+  .list-row.with-check,
+  .list-header.with-check {
+    grid-template-columns: 32px 1fr 90px;
   }
 
   .col-size,
