@@ -54,3 +54,8 @@ src/main/resources/application-prod.yaml
 src/main/resources/application-local.yml
 src/main/resources/application-prod.yml
 
+### Cloudflare Tunnel 本地執行檔與日誌 ###
+cloudflared.exe
+cloudflared_output.log
+
+

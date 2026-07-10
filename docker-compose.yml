@@ -11,7 +11,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=sa
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - APP_UPLOAD_DIR=/app/uploads
-      - JWT_SECRET=mini_youtube_local_dev_placeholder_secret_key_must_be_at_least_256_bits
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       # 自動掛載 .env 中定義的 NAS Samba 共享路徑
       - "${APP_UPLOAD_DIR}:/app/uploads"
