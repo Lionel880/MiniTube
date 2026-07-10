@@ -1,7 +1,7 @@
-# MiniTube Docker Compose 一鍵啟動與 Cloudflare 公網穿透腳本
+# MiniTube Docker Compose Startup Script
 Clear-Host
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "     MiniTube Docker Compose 服務啟動工具    " -ForegroundColor Cyan
+Write-Host "     MiniTube Docker Compose Start Utility   " -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -10,16 +10,16 @@ if ([string]::IsNullOrEmpty($ProjectDir)) {
     $ProjectDir = $PWD.Path
 }
 
-# 停止舊容器
-Write-Host "[1/3] 正在清理舊有的 Docker 容器..." -ForegroundColor Yellow
+# Stop old containers
+Write-Host "[1/3] Cleaning up old Docker containers..." -ForegroundColor Yellow
 docker compose down --remove-orphans
 
-# 編譯並啟動
-Write-Host "[2/3] 正在建置並啟動 Docker 容器 (背景執行)..." -ForegroundColor Yellow
+# Build and start
+Write-Host "[2/3] Building and starting Docker containers (Background)..." -ForegroundColor Yellow
 docker compose up --build -d
 
-# 獲取 Cloudflare 穿透網址
-Write-Host "[3/3] 正在等待 Cloudflare Tunnel 建立連線並取得網址..." -ForegroundColor Yellow
+# Get Cloudflare Tunnel URL
+Write-Host "[3/3] Waiting for Cloudflare Tunnel to establish connection..." -ForegroundColor Yellow
 $maxAttempts = 30
 $attempt = 1
 $tunnelUrl = ""
@@ -40,19 +40,22 @@ while ($attempt -le $maxAttempts) {
 }
 
 if ($tunnelUrl) {
-    Write-Host "`n=============================================" -ForegroundColor Green
-    Write-Host " 🎉 MiniTube 已成功啟動並完成公網穿透！" -ForegroundColor Green
-    Write-Host " ---------------------------------------------" -ForegroundColor Gray
-    Write-Host " 🔗 手機/電腦外網播放專屬網址：" -ForegroundColor White
-    Write-Host "    $tunnelUrl" -ForegroundColor Cyan
-    Write-Host " ---------------------------------------------" -ForegroundColor Gray
-    Write-Host " 💡 提示：使用此網址進入，前端與後端為【完全同源】，" -ForegroundColor White
-    Write-Host "    手機 iOS Safari 將不會阻擋任何 Cookie，能完美播放影片！" -ForegroundColor White
+    Write-Host ""
     Write-Host "=============================================" -ForegroundColor Green
+    Write-Host " 🎉 MiniTube started successfully!" -ForegroundColor Green
+    Write-Host " ---------------------------------------------" -ForegroundColor Gray
+    Write-Host " 🔗 Public Tunnel URL:" -ForegroundColor White
+    Write-Host "    $tunnelUrl" -ForegroundColor Cyan
+    Write-Host " =============================================" -ForegroundColor Green
 } else {
-    Write-Warning "無法在 30 秒內取得 Cloudflare 穿透網址，請執行 'docker logs minitube-tunnel' 手動檢查日誌。"
+    Write-Warning "Could not retrieve Cloudflare Tunnel URL within 30 seconds."
+    Write-Warning "Please run 'docker logs minitube-tunnel' to inspect logs manually."
 }
 
 Write-Host ""
-Write-Host "按任意鍵關閉此視窗..." -ForegroundColor DarkGray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Press any key to close this window..." -ForegroundColor DarkGray
+if ($Host.Name -eq "ConsoleHost") {
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+} else {
+    Start-Sleep -Seconds 3
+}
