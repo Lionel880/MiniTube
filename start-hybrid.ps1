@@ -64,7 +64,7 @@ $timeout = 30
 $elapsed = 0
 while ($elapsed -lt $timeout) {
     Start-Sleep -Seconds 1
-    $log = docker logs minitube-tunnel 2>&1
+    $log = (docker logs minitube-tunnel 2>&1) -join "`n"
     if ($log -match "(https://[a-zA-Z0-9-]+\.trycloudflare\.com)") {
         $tunnelUrl = $Matches[1]
         break
