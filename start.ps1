@@ -1,7 +1,7 @@
-# MiniTube 一鍵啟動與公網穿透腳本
+# MiniTube Local Hybrid Startup Script (Pure ASCII)
 Clear-Host
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "    MiniTube SQL Server 啟動與公網穿透服務   " -ForegroundColor Cyan
+Write-Host "    MiniTube Local Hybrid Service Startup    " -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -10,29 +10,59 @@ if ([string]::IsNullOrEmpty($ProjectDir)) {
     $ProjectDir = $PWD.Path
 }
 
-Write-Host "[1/2] 正在啟動後端 Spring Boot 服務 (將開啟新視窗)..." -ForegroundColor Yellow
-Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "`$env:SPRING_PROFILES_ACTIVE='local'; ./mvnw spring-boot:run"
-
+# 1. Load .env file variables into current process environment
 $EnvFile = "$ProjectDir\.env"
-$NgrokToken = ""
 if (Test-Path $EnvFile) {
-    $EnvContent = Get-Content $EnvFile
-    foreach ($Line in $EnvContent) {
-        if ($Line -match "^NGROK_AUTHTOKEN=(.*)$") {
-            $NgrokToken = $Matches[1].Trim()
+    Write-Host "Loading environment variables from .env..." -ForegroundColor Gray
+    Get-Content $EnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line -match "^([^=]+)=(.*)$") {
+            $key = $Matches[1].Trim()
+            $value = $Matches[2].Trim()
+            [Environment]::SetEnvironmentVariable($key, $value, "Process")
         }
     }
 }
 
-Write-Host "[2/2] 正在啟動 ngrok 公網穿透服務 (將開啟新視窗)..." -ForegroundColor Yellow
-Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "npx ngrok http 8080 --url=denote-reveal-compel.ngrok-free.dev --authtoken=$NgrokToken"
+# 2. Build frontend Vue SPA
+Write-Host "[1/4] Building Vue frontend..." -ForegroundColor Yellow
+Set-Location -Path "$ProjectDir\frontend"
+npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Frontend build failed."
+    exit 1
+}
 
-Write-Host "`n=============================================" -ForegroundColor Green
-Write-Host " 啟動指令已成功送出！" -ForegroundColor Green
-Write-Host " 1. 請在新開的 Spring Boot 視窗中等待出現 'Started MiniYoutubeApplication'" -ForegroundColor White
-Write-Host " 2. 請在您的手機、平板或電腦打開部署網頁" -ForegroundColor White
-Write-Host " 3. 點選右上角『⚙️ 設定 API』並輸入您的固定網址：https://denote-reveal-compel.ngrok-free.dev" -ForegroundColor White
+# 3. Sync to Spring Boot static resources
+Write-Host "[2/4] Syncing frontend static resources..." -ForegroundColor Yellow
+$StaticDir = "$ProjectDir\src\main\resources\static"
+if (Test-Path $StaticDir) {
+    Remove-Item -Recurse -Force "$StaticDir\*"
+} else {
+    New-Item -ItemType Directory -Path $StaticDir -Force
+}
+Copy-Item -Path "$ProjectDir\frontend\dist\*" -Destination $StaticDir -Recurse -Force
+
+# 4. Start Spring Boot locally on host
+Write-Host "[3/4] Starting Spring Boot locally (opens in new window)..." -ForegroundColor Yellow
+Set-Location -Path $ProjectDir
+Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "`$env:SPRING_PROFILES_ACTIVE='local'; ./mvnw spring-boot:run"
+
+# 5. Start Cloudflare Tunnel locally
+Write-Host "[4/4] Starting Cloudflare Tunnel locally (opens in new window)..." -ForegroundColor Yellow
+# If cloudflared.exe is missing, download it
+if (-not (Test-Path "$ProjectDir\cloudflared.exe")) {
+    Write-Host "Downloading cloudflared.exe..." -ForegroundColor Gray
+    curl.exe -L -o "$ProjectDir\cloudflared.exe" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+}
+Start-Process powershell -WorkingDirectory $ProjectDir -ArgumentList "-NoExit", "-Command", "./cloudflared.exe tunnel --url http://localhost:8080"
+
+Write-Host ""
+Write-Host "=============================================" -ForegroundColor Green
+Write-Host " Startup commands sent successfully!" -ForegroundColor Green
+Write-Host " 1. Wait for 'Started MiniYoutubeApplication' in the Spring Boot window." -ForegroundColor White
+Write-Host " 2. Find your trycloudflare.com URL in the cloudflared window!" -ForegroundColor White
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "按任意鍵關閉此視窗..." -ForegroundColor DarkGray
+Write-Host "Press any key to close this window..." -ForegroundColor DarkGray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
