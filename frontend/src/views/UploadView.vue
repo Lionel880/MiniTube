@@ -93,16 +93,20 @@ async function onSubmit() {
     return;
   }
 
+  const activeFolderId = sessionStorage.getItem("minitube_active_folder_id");
+  const folderId = activeFolderId && activeFolderId !== "null" ? Number(activeFolderId) : null;
+
   if (files.value.length === 1) {
     // 單檔背景上傳
     uploadStore.startUploadSingle({
       title: title.value,
       description: description.value,
+      folderId: folderId,
       file: files.value[0]
     });
   } else {
     // 多檔背景批量上傳
-    uploadStore.startUploadBatch(files.value);
+    uploadStore.startUploadBatch(files.value, folderId);
   }
 
   // 按下上傳後立刻秒回首頁，讓它在背景慢慢傳

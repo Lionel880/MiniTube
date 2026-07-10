@@ -48,15 +48,17 @@ public class VideoController {
             Authentication authentication,
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "folderId", required = false) Long folderId,
             @RequestPart("file") MultipartFile file) {
-        return videoService.upload(authentication.getName(), title, description, file);
+        return videoService.upload(authentication.getName(), title, description, folderId, file);
     }
 
     @PostMapping(value = "/upload/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<VideoDetailResponse> uploadBatch(
             Authentication authentication,
+            @RequestParam(value = "folderId", required = false) Long folderId,
             @RequestParam("files") MultipartFile[] files) {
-        return videoService.uploadBatch(authentication.getName(), files);
+        return videoService.uploadBatch(authentication.getName(), folderId, files);
     }
 
     @GetMapping

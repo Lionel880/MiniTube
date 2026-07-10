@@ -10,7 +10,7 @@ export const useUploadStore = defineStore("upload", {
   }),
 
   actions: {
-    async startUploadSingle({ title, description, file }, onDone) {
+    async startUploadSingle({ title, description, folderId, file }, onDone) {
       this.isUploading = true;
       this.progress = 0;
       this.filesCount = 1;
@@ -18,7 +18,7 @@ export const useUploadStore = defineStore("upload", {
 
       try {
         const video = await uploadVideo(
-          { title, description, file },
+          { title, description, folderId, file },
           (event) => {
             if (event.total) {
               this.progress = Math.round((event.loaded / event.total) * 100);
@@ -34,14 +34,14 @@ export const useUploadStore = defineStore("upload", {
       }
     },
 
-    async startUploadBatch(files, onDone) {
+    async startUploadBatch(files, folderId, onDone) {
       this.isUploading = true;
       this.progress = 0;
       this.filesCount = files.length;
       this.errorMessage = "";
 
       try {
-        await uploadVideosBatch(files, (event) => {
+        await uploadVideosBatch(files, folderId, (event) => {
           if (event.total) {
             this.progress = Math.round((event.loaded / event.total) * 100);
           }

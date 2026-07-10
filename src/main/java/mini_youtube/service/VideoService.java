@@ -41,7 +41,7 @@ public class VideoService {
     private final TranscodingService transcodingService;
 
     @Transactional
-    public VideoDetailResponse upload(String username, String title, String description, MultipartFile file) {
+    public VideoDetailResponse upload(String username, String title, String description, Long folderId, MultipartFile file) {
         if (title == null || title.isBlank()) {
             throw new BusinessException("影片標題不能為空");
         }
@@ -53,6 +53,16 @@ public class VideoService {
         }
 
         User uploader = getUserOrThrow(username);
+        
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new BusinessException("找不到該資料夾"));
+            if (!folder.getOwner().getUsername().equalsIgnoreCase(username)) {
+                throw new BusinessException("您沒有權限將影片放入該資料夾");
+            }
+        }
+
         String storedFilename = fileStorageService.store(file);
 
         String finalTitle = title.trim();
@@ -68,6 +78,7 @@ public class VideoService {
                 .status(VideoStatus.UPLOADING)
                 .viewCount(0L)
                 .uploader(uploader)
+                .folder(folder)
                 .build();
 
         Video saved = videoRepository.save(video);
@@ -79,8 +90,18 @@ public class VideoService {
     }
 
     @Transactional
-    public List<VideoDetailResponse> uploadBatch(String username, MultipartFile[] files) {
+    public List<VideoDetailResponse> uploadBatch(String username, Long folderId, MultipartFile[] files) {
         User uploader = getUserOrThrow(username);
+        
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new BusinessException("找不到該資料夾"));
+            if (!folder.getOwner().getUsername().equalsIgnoreCase(username)) {
+                throw new BusinessException("您沒有權限將影片放入該資料夾");
+            }
+        }
+
         List<VideoDetailResponse> responses = new ArrayList<>();
 
         for (MultipartFile file : files) {
@@ -108,6 +129,7 @@ public class VideoService {
                     .status(VideoStatus.UPLOADING)
                     .viewCount(0L)
                     .uploader(uploader)
+                    .folder(folder)
                     .build();
 
             Video saved = videoRepository.save(video);

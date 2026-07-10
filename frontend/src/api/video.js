@@ -12,10 +12,13 @@ export function getVideo(id) {
   return http.get(`/videos/${id}`).then((res) => res.data);
 }
 
-export function uploadVideo({ title, description, file }, onUploadProgress) {
+export function uploadVideo({ title, description, folderId, file }, onUploadProgress) {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("description", description || "");
+  if (folderId) {
+    formData.append("folderId", folderId);
+  }
   formData.append("file", file);
 
   return http
@@ -27,10 +30,13 @@ export function uploadVideo({ title, description, file }, onUploadProgress) {
     .then((res) => res.data);
 }
 
-export function uploadVideosBatch(files, onUploadProgress) {
+export function uploadVideosBatch(files, folderId, onUploadProgress) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
     formData.append("files", files[i]);
+  }
+  if (folderId) {
+    formData.append("folderId", folderId);
   }
 
   return http
