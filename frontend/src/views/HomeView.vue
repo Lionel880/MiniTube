@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import { listVideos, batchDeleteVideos, deleteAllVideos } from "../api/video";
 import { useAuthStore } from "../store/auth";
@@ -14,6 +14,16 @@ const authStore = useAuthStore();
 const uploadStore = useUploadStore();
 const videos = ref([]);
 const folders = ref([]);
+const sortedFolders = computed(() => {
+  const list = [...folders.value];
+  const multiplier = sortDir.value === "asc" ? 1 : -1;
+  if (sortBy.value === "title") {
+    return list.sort((a, b) => a.name.localeCompare(b.name, "zh-TW") * multiplier);
+  } else {
+    // 預設為建立時間 (createdAt)
+    return list.sort((a, b) => (new Date(a.createdAt) - new Date(b.createdAt)) * multiplier);
+  }
+});
 const page = ref(0);
 const totalPages = ref(0);
 const loading = ref(false);
@@ -277,7 +287,7 @@ function formatDate(value) {
     <template v-else>
       <!-- 麵包屑導航（當在資料夾內時） -->
       <div v-if="currentFolderId !== null" class="breadcrumb-container">
-        <button class="btn btn-back" @click="exitFolder">⬅ 返回上一頁</button>
+        <button class="btn btn-back" @click="exitFolder">返回上一頁</button>
         <div class="breadcrumb">
           <span class="crumb-link" @click="exitFolder">全部影片</span>
           <span class="crumb-separator">/</span>
@@ -289,23 +299,23 @@ function formatDate(value) {
       <div v-if="currentFolderId === null" class="folders-section">
         <div class="section-title-row">
           <h3 class="section-title">資料夾</h3>
-          <button class="btn" @click="createFolder">📁 新增資料夾</button>
+          <button class="btn" @click="createFolder">新增資料夾</button>
         </div>
         <div class="folders-grid">
           <div
-            v-for="folder in folders"
+            v-for="folder in sortedFolders"
             :key="folder.id"
             class="folder-card"
             @click="enterFolder(folder)"
           >
-            <div class="folder-icon">📁</div>
+            <div class="folder-icon">資料夾</div>
             <div class="folder-info">
               <div class="folder-name" :title="folder.name">{{ folder.name }}</div>
               <div class="folder-date">{{ formatDate(folder.createdAt) }}</div>
             </div>
             <div class="folder-actions" @click.stop>
-              <button class="folder-action-btn" @click="editFolder(folder)" title="修改資料夾名稱">✏️</button>
-              <button class="folder-action-btn delete" @click="deleteFolder(folder)" title="刪除資料夾">✕</button>
+              <button class="folder-action-btn" @click="editFolder(folder)" title="修改資料夾名稱">編輯</button>
+              <button class="folder-action-btn delete" @click="deleteFolder(folder)" title="刪除資料夾">刪除</button>
             </div>
           </div>
           <div v-if="folders.length === 0" class="folders-empty">
@@ -336,7 +346,7 @@ function formatDate(value) {
               title="卡片網格模式"
               @click="viewMode = 'grid'"
             >
-              🎚️ 卡片
+              卡片
             </button>
             <button
               class="icon-btn"
@@ -345,7 +355,7 @@ function formatDate(value) {
               title="橫向清單模式"
               @click="viewMode = 'list'"
             >
-              ☰ 清單
+              清單
             </button>
           </div>
         </div>
@@ -362,7 +372,7 @@ function formatDate(value) {
             type="button"
             @click="toggleSelectMode"
           >
-            {{ selectMode ? '取消多選' : '☑️ 多選影片' }}
+            {{ selectMode ? '取消多選' : '多選影片' }}
           </button>
           
           <!-- 批量刪除 -->
@@ -382,7 +392,7 @@ function formatDate(value) {
               type="button"
               @click="showBatchFolderDropdown = !showBatchFolderDropdown"
             >
-              📁 移入資料夾 ({{ selectedIds.length }})
+              移入資料夾 ({{ selectedIds.length }})
             </button>
             <div v-if="showBatchFolderDropdown" class="batch-folder-dropdown">
               <div class="dropdown-header">移動選取影片至：</div>
@@ -403,7 +413,7 @@ function formatDate(value) {
             type="button"
             @click="deleteAll"
           >
-            🧹 一鍵全部刪除
+            一鍵全部刪除
           </button>
         </div>
       </div>

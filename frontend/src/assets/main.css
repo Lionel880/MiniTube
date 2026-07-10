@@ -1,25 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
-  --bg-primary: #0a0a0c;
-  --bg-secondary: #111115;
-  --bg-card: #141419;
-  --border-color: #222228;
-  --border-hover: #32323f;
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #52525b;
-  --accent-blue: #2563eb;
-  --accent-hover: #1d4ed8;
-  --danger-color: #dc2626;
-  --success-color: #16a34a;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-brand: 'Outfit', sans-serif;
-  --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-premium: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #0f0f0f;
+  --bg-card: #0f0f0f;
+  --border-color: #272727;
+  --border-hover: #3f3f3f;
+  --text-primary: #f1f1f1;
+  --text-secondary: #aaaaaa;
+  --text-muted: #606060;
+  --accent-blue: #3ea6ff;
+  --accent-hover: #65b8ff;
+  --danger-color: #ff4e45;
+  --success-color: #2ba640;
+  --font-sans: 'Roboto', system-ui, -apple-system, sans-serif;
+  --font-brand: 'Roboto', system-ui, -apple-system, sans-serif;
+  --transition-smooth: all 0.2s ease;
+  --shadow-premium: none;
   --border-radius-sm: 4px;
-  --border-radius-md: 6px;
-  --border-radius-lg: 8px;
+  --border-radius-md: 18px;
+  --border-radius-lg: 12px;
 }
 
 * {
@@ -36,13 +36,13 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   scrollbar-width: thin;
-  scrollbar-color: var(--border-color) var(--bg-primary);
+  scrollbar-color: var(--border-hover) var(--bg-primary);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-primary);
@@ -52,7 +52,7 @@ body {
   border-radius: var(--border-radius-sm);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--border-hover);
 }
 
 a {
@@ -73,12 +73,12 @@ main {
   flex-direction: column;
 }
 
-/* ---------- Glassmorphism Card (Redesigned to Clean Card) ---------- */
+/* ---------- Flat Card (Redesigned to YouTube Flat Card) ---------- */
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-premium);
+  box-shadow: none;
   transition: var(--transition-smooth);
 }
 
@@ -91,23 +91,21 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 32px;
+  padding: 12px 24px;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .navbar .brand {
   font-family: var(--font-brand);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .navbar .brand span {
@@ -119,19 +117,20 @@ main {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 440px;
+  max-width: 520px;
   display: flex;
   align-items: center;
-  background: var(--bg-primary);
+  background: #121212;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  padding: 2px 4px 2px 12px;
+  border-radius: 40px;
+  padding: 0 4px 0 16px;
   transition: var(--transition-smooth);
+  height: 40px;
+  overflow: hidden;
 }
 
 .navbar form:focus-within {
   border-color: var(--accent-blue);
-  background: var(--bg-primary);
 }
 
 .navbar input[type="text"] {
@@ -139,7 +138,7 @@ main {
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   padding: 6px 0;
 }
@@ -149,19 +148,19 @@ main {
 }
 
 .navbar button.search-btn {
-  padding: 6px 14px;
+  padding: 0 20px;
+  height: 100%;
   border: none;
-  background: var(--accent-blue);
-  color: #fff;
-  border-radius: var(--border-radius-sm);
+  border-left: 1px solid var(--border-color);
+  background: #222222;
+  color: var(--text-primary);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
   transition: var(--transition-smooth);
 }
 
 .navbar button.search-btn:hover {
-  background: var(--accent-hover);
+  background: #2d2d2d;
 }
 
 .navbar .nav-actions {
@@ -178,15 +177,15 @@ main {
   padding-right: 12px;
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- YouTube Pill-Style Buttons ---------- */
 .btn {
   padding: 8px 16px;
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
+  border: none;
   color: var(--text-primary);
-  background: var(--bg-card);
+  background: #272727;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -196,35 +195,31 @@ main {
 }
 
 .btn:hover {
-  background: var(--border-color);
-  border-color: var(--text-muted);
+  background: #3f3f3f;
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .btn.primary {
-  background: var(--accent-blue);
-  border-color: transparent;
-  color: #fff;
-  font-weight: 600;
+  background: #f1f1f1;
+  color: #0f0f0f;
+  font-weight: 500;
 }
 
 .btn.primary:hover {
-  background: var(--accent-hover);
+  background: #d9d9d9;
 }
 
 .btn.danger {
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.3);
-  color: #f87171;
+  background: rgba(255, 78, 69, 0.1);
+  color: var(--danger-color);
 }
 
 .btn.danger:hover {
   background: var(--danger-color);
   color: #fff;
-  border-color: transparent;
 }
 
 /* ---------- Layout ---------- */
@@ -426,19 +421,21 @@ main {
 /* ---------- Video Card ---------- */
 .video-card {
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.01);
-  border-radius: 12px;
-  border: 1px solid transparent;
-  overflow: hidden;
-  transition: var(--transition-smooth);
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  overflow: visible;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .video-card:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--border-color);
-  transform: translateY(-4px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  background: transparent;
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
 }
 
 .video-card .thumb-container {
@@ -446,18 +443,18 @@ main {
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .video-card .thumb {
   width: 100%;
   height: 100%;
-  background: #18181c url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M8 5v14l11-7z'/></svg>") no-repeat center / 48px;
+  background: #1f1f1f url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23aaaaaa'><path d='M8 5v14l11-7z'/></svg>") no-repeat center / 48px;
   transition: var(--transition-smooth);
 }
 
 .video-card:hover .thumb {
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .video-card .card-checkbox {
@@ -477,7 +474,7 @@ main {
 }
 
 .video-card .info {
-  padding: 12px 8px 8px;
+  padding: 0 4px;
 }
 
 .video-card .title {

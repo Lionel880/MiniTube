@@ -105,7 +105,7 @@ function formatSize(bytes) {
         <div class="spinner-small"></div> 轉碼中...
       </div>
       <div v-else-if="video.status === 'FAILED'" class="status-overlay failed">
-        ❌ 轉碼失敗
+        轉碼失敗
       </div>
       <input
         v-if="showCheckbox"
@@ -121,7 +121,7 @@ function formatSize(bytes) {
         <div class="title" :title="video.title" @click="goToDetail">{{ video.title }}</div>
         <div v-if="folders && folders.length" class="folder-move-container">
           <button class="folder-move-btn" @click="showDropdown = !showDropdown" title="移動到資料夾">
-            📁
+            分類
           </button>
           <div v-if="showDropdown" class="folder-dropdown">
             <div class="dropdown-item header">移動至資料夾：</div>

@@ -137,7 +137,7 @@ function clearApiUrl() {
   <Transition name="fade">
     <div v-if="isModalOpen" class="modal-overlay" @click.self="isModalOpen = false">
       <div class="modal-content">
-        <h3>⚙️ API 伺服器連線設定</h3>
+        <h3>API 伺服器連線設定</h3>
         <p class="modal-desc">
           若在其他裝置（手機/平板）使用部署版，請在此輸入您桌機本地後端的 **HTTPS 公網穿透網址** (由 Local Tunnel 產生)。
         </p>
@@ -154,8 +154,8 @@ function clearApiUrl() {
 
         <!-- 測試連線回報狀態 -->
         <div v-if="testMessage" class="test-feedback" :class="testStatus">
-          <span v-if="testStatus === 'success'">✔️</span>
-          <span v-else>❌</span>
+          <span v-if="testStatus === 'success'">成功：</span>
+          <span v-else>失敗：</span>
           {{ testMessage }}
         </div>
 
