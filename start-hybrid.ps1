@@ -10,6 +10,21 @@ if ([string]::IsNullOrEmpty($ProjectDir)) {
     $ProjectDir = $PWD.Path
 }
 
+# Load .env file variables into current process environment
+$EnvFile = "$ProjectDir\.env"
+if (Test-Path $EnvFile) {
+    Write-Host "Loading environment variables from .env..." -ForegroundColor Gray
+    Get-Content $EnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line -match "^([^=]+)=(.*)$") {
+            $key = $Matches[1].Trim()
+            $value = $Matches[2].Trim()
+            $env:$key = $value
+            [Environment]::SetEnvironmentVariable($key, $value, "Process")
+        }
+    }
+}
+
 # 1. Build frontend Vue SPA
 Write-Host "[1/5] Building Vue frontend..." -ForegroundColor Yellow
 Set-Location -Path "$ProjectDir\frontend"
