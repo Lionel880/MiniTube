@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
-import { listVideos, batchDeleteVideos, deleteAllVideos } from "../api/video";
+import { listVideos, searchVideos, batchDeleteVideos, deleteAllVideos } from "../api/video";
 import { useAuthStore } from "../store/auth";
 import VideoCard from "../components/VideoCard.vue";
 import { useUploadStore } from "../store/upload";
@@ -52,12 +52,16 @@ const viewMode = ref(localStorage.getItem("minitube_view_mode") || "grid");
 
 // 批量刪除與移動選擇狀態
 const selectedIds = ref([]);
+const selectedFolderIds = ref([]);
 const selectMode = ref(false);
 const showBatchFolderDropdown = ref(false);
+
+const totalSelected = computed(() => selectedIds.value.length + selectedFolderIds.value.length);
 
 function toggleSelectMode() {
   selectMode.value = !selectMode.value;
   selectedIds.value = [];
+  selectedFolderIds.value = [];
   showBatchFolderDropdown.value = false;
 }
 
@@ -126,13 +130,57 @@ function exitFolder() {
 async function batchMoveToFolder(folderId) {
   showBatchFolderDropdown.value = false;
   try {
-    const url = "/videos/batch/folder" + (folderId ? `?folderId=${folderId}` : "");
-    await http.put(url, selectedIds.value);
+    // 移動影片
+    if (selectedIds.value.length > 0) {
+      const url = "/videos/batch/folder" + (folderId ? `?folderId=${folderId}` : "");
+      await http.put(url, selectedIds.value);
+    }
     selectMode.value = false;
+    selectedIds.value = [];
+    selectedFolderIds.value = [];
     load(page.value);
   } catch (err) {
     alert("批量移動影片失敗：" + (err.response?.data?.message || err.message));
   }
+}
+
+const searchKeyword = ref("");
+
+function toggleSort(field) {
+  if (sortBy.value === field) {
+    sortDir.value = sortDir.value === "asc" ? "desc" : "asc";
+    folderSortDir.value = sortDir.value;
+  } else {
+    sortBy.value = field;
+    sortDir.value = "desc";
+    folderSortBy.value = field === "title" ? "name" : "createdAt";
+    folderSortDir.value = "desc";
+  }
+}
+
+function toggleSortDirection() {
+  sortDir.value = sortDir.value === "asc" ? "desc" : "asc";
+  folderSortDir.value = sortDir.value;
+}
+
+function onLocalSearch() {
+  load(0);
+}
+
+function goToVideo(video) {
+  if (selectMode.value) {
+    handleSelect(video.id, !selectedIds.value.includes(video.id));
+  } else {
+    router.push({ name: "video-detail", params: { id: video.id } });
+  }
+}
+
+function formatSize(bytes) {
+  if (!bytes) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 async function load(p = 0, silent = false) {
@@ -142,16 +190,30 @@ async function load(p = 0, silent = false) {
   }
   try {
     const folderQueryId = currentFolderId.value === null ? "root" : currentFolderId.value.toString();
-    const data = await listVideos({
-      folderId: folderQueryId,
-      page: p,
-      size: 12,
-      sortBy: sortBy.value,
-      sortDir: sortDir.value,
-    });
-    videos.value = data.videos;
-    page.value = data.page;
-    totalPages.value = data.totalPages;
+    
+    let data;
+    if (searchKeyword.value.trim()) {
+      data = await searchVideos({
+        q: searchKeyword.value.trim(),
+        folderId: currentFolderId.value === null ? "" : currentFolderId.value.toString(),
+        page: p,
+        size: 12,
+        sortBy: sortBy.value,
+        sortDir: sortDir.value,
+      });
+    } else {
+      data = await listVideos({
+        folderId: folderQueryId,
+        page: p,
+        size: 12,
+        sortBy: sortBy.value,
+        sortDir: sortDir.value,
+      });
+    }
+    
+    videos.value = data.videos || [];
+    page.value = data.page || 0;
+    totalPages.value = data.totalPages || 0;
     if (!silent) {
       selectedIds.value = [];
     }
@@ -207,11 +269,40 @@ function handleSelect(id, checked) {
 }
 
 async function deleteSelected() {
-  if (selectedIds.value.length === 0) return;
-  if (!confirm(`確定要刪除這 ${selectedIds.value.length} 支影片嗎？此動作無法復原！`)) return;
+  if (selectedIds.value.length === 0 && selectedFolderIds.value.length === 0) return;
+  const total = totalSelected.value;
+  if (!confirm(`確定要刪除這 ${total} 個項目嗎？（包含影片 ${selectedIds.value.length} 個，資料夾 ${selectedFolderIds.value.length} 個）\n此動作無法復原！`)) return;
   try {
-    await batchDeleteVideos(selectedIds.value);
+    // 刪除影片
+    if (selectedIds.value.length > 0) {
+      await batchDeleteVideos(selectedIds.value);
+    }
+    // 逐一刪除資料夾
+    for (const fid of selectedFolderIds.value) {
+      await http.delete(`/folders/${fid}`);
+    }
     selectMode.value = false;
+    selectedIds.value = [];
+    selectedFolderIds.value = [];
+    loadFolders();
+    load(page.value);
+  } catch (err) {
+    alert("刪除失敗：" + err.message);
+  }
+}
+
+function handleFolderSelect(id, checked) {
+  if (checked) {
+    if (!selectedFolderIds.value.includes(id)) selectedFolderIds.value.push(id);
+  } else {
+    selectedFolderIds.value = selectedFolderIds.value.filter((x) => x !== id);
+  }
+}
+
+async function deleteOneVideo(video) {
+  if (!confirm(`確定要刪除影片「${video.title}」嗎？此動作無法復原！`)) return;
+  try {
+    await batchDeleteVideos([video.id]);
     load(page.value);
   } catch (err) {
     alert("刪除失敗：" + err.message);
@@ -308,287 +399,425 @@ function formatDate(value) {
 
 <template>
   <div class="page">
-    <!-- 未登入時不顯示任何影片，提示先登入 -->
+    <!-- 未登入提示 -->
     <div v-if="!authStore.isLoggedIn" class="login-prompt">
       <p>登入查看與管理你上傳的影片。</p>
       <RouterLink class="btn primary" :to="{ name: 'login' }">前往登入</RouterLink>
     </div>
 
     <template v-else>
-      <!-- 麵包屑導航（當在資料夾內時） -->
-      <div v-if="currentFolderId !== null" class="breadcrumb-container">
-        <button class="btn btn-back" @click="exitFolder">返回上一頁</button>
-        <div class="breadcrumb">
-          <span class="crumb-link" @click="exitFolder">全部影片</span>
-          <span class="crumb-separator">/</span>
-          <span class="crumb-current">{{ currentFolderName }}</span>
+      <!-- ===== 頂部操作列 ===== -->
+      <div class="action-bar">
+        <div class="action-bar-left">
+          <RouterLink class="action-btn primary" :to="{ name: 'upload' }">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+            </svg>
+            上傳
+          </RouterLink>
+          <button class="action-btn" @click="createFolder">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/>
+            </svg>
+            新建文件夾
+          </button>
+        </div>
+        <div class="action-bar-right">
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" class="search-icon">
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <input
+              v-model="searchKeyword"
+              type="text"
+              placeholder="搜尋文件"
+              @input="onLocalSearch"
+              @keydown.enter="onLocalSearch"
+            />
+          </div>
         </div>
       </div>
 
-      <!-- 資料夾列表區塊（僅在根目錄顯示） -->
-      <div v-if="currentFolderId === null" class="folders-section">
-        <div class="section-title-row">
-          <div class="section-left">
-            <h3 class="section-title">資料夾</h3>
-            <div class="folder-sorting">
-              <span class="label">排序依據：</span>
-              <select v-model="folderSortBy" class="select-input">
-                <option value="createdAt">建立時間</option>
-                <option value="name">名稱</option>
-              </select>
-              <select v-model="folderSortDir" class="select-input">
-                <option value="desc">降冪</option>
-                <option value="asc">升冪</option>
-              </select>
-            </div>
+      <!-- ===== 麵包屑 / 導航列 ===== -->
+      <div class="nav-bar">
+        <div class="nav-bar-left">
+          <button v-if="currentFolderId !== null" class="nav-back-btn" @click="exitFolder" title="返回上一層">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
+          </button>
+          <span class="nav-separator" v-if="currentFolderId !== null">|</span>
+          <div class="breadcrumb-group">
+            <span
+              v-if="currentFolderId !== null"
+              class="crumb-link"
+              @click="exitFolder"
+            >全部影片</span>
+            <span v-if="currentFolderId !== null" class="crumb-sep">›</span>
+            <span class="crumb-current">{{ currentFolderId !== null ? currentFolderName : '全部影片' }}</span>
+            <svg v-if="currentFolderId === null" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="crumb-arrow">
+              <path d="M7 10l5 5 5-5z"/>
+            </svg>
           </div>
-          <button class="btn" @click="createFolder">新增資料夾</button>
         </div>
-        <div class="folders-grid">
-          <div
-            v-for="folder in sortedFolders"
-            :key="folder.id"
-            class="folder-card"
-            @click="enterFolder(folder)"
-          >
-            <div class="folder-icon">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="color: #aaa; display: block;">
-                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+
+        <div class="nav-bar-right">
+          <!-- 上傳中指示器 -->
+          <div v-if="uploadStore.isUploading" class="upload-indicator" @click="router.push({ name: 'upload' })" title="點擊查看上傳詳情">
+            <div class="spinner-tiny"></div>
+            <span>{{ uploadStore.progress }}%</span>
+          </div>
+
+          <!-- 刷新 -->
+          <button class="nav-icon-btn" @click="load(0)" title="刷新">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+          </button>
+
+          <!-- 多選 / 批量 -->
+          <button class="nav-icon-btn" :class="{ active: selectMode }" @click="toggleSelectMode" title="多選">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2zM7 17h10V7H7v10zm2-8h6v6H9V9z"/>
+            </svg>
+          </button>
+
+          <!-- 視圖切換 (格狀/列表) -->
+          <div class="view-toggle">
+            <button class="nav-icon-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'" title="列表視圖">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M3 5h2V3c-1.1 0-2 .9-2 2zm0 4h2V7H3v2zm0 4h2v-2H3v2zm0 4h2v-2H3v2zm0 4h2v-2H3v2zm4 0h14v-2H7v2zm0-4h14v-2H7v2zm0-4h14v-2H7v2zm0-4h14V7H7v2zm0-6v2h14V3H7z"/>
               </svg>
-            </div>
-            <div class="folder-info">
-              <div class="folder-name" :title="folder.name">{{ folder.name }}</div>
-              <div class="folder-date">{{ formatDate(folder.createdAt) }}</div>
-            </div>
-            <div class="folder-actions" @click.stop>
-              <button class="folder-action-btn" @click="editFolder(folder)" title="修改資料夾名稱">編輯</button>
-              <button class="folder-action-btn delete" @click="deleteFolder(folder)" title="刪除資料夾">刪除</button>
-            </div>
-          </div>
-          <div v-if="folders.length === 0" class="folders-empty">
-            目前沒有資料夾，點擊上方按鈕建立新資料夾。
+            </button>
+            <button class="nav-icon-btn" :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'" title="格狀視圖">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v2zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="toolbar">
-        <div class="sorting-controls">
-          <span class="label">排序依據：</span>
-          <select id="sortBy" v-model="sortBy" class="select-input">
-            <option value="createdAt">上傳時間</option>
-            <option value="title">名稱</option>
-            <option value="fileSize">檔案大小</option>
-          </select>
-          <select v-model="sortDir" class="select-input">
-            <option value="desc">降冪 (大到小 / 新到舊)</option>
-            <option value="asc">升冪 (小到大 / 舊到新)</option>
-          </select>
-
-          <!-- 檢視模式切換按鈕 -->
-          <div class="view-mode-toggle">
-            <button
-              class="icon-btn"
-              type="button"
-              :class="{ active: viewMode === 'grid' }"
-              title="卡片網格模式"
-              @click="viewMode = 'grid'"
-            >
-              卡片
-            </button>
-            <button
-              class="icon-btn"
-              type="button"
-              :class="{ active: viewMode === 'list' }"
-              title="橫向清單模式"
-              @click="viewMode = 'list'"
-            >
-              清單
-            </button>
+      <!-- 批量操作列 (多選模式下才顯示) -->
+      <div v-if="selectMode && totalSelected > 0" class="batch-bar">
+        <span class="batch-count">已選擇 {{ totalSelected }} 個項目</span>
+        <button class="action-btn danger" @click="deleteSelected">
+          刪除 ({{ totalSelected }})
+        </button>
+        <div class="batch-folder-container" v-if="selectedIds.length > 0">
+          <button class="action-btn" @click="showBatchFolderDropdown = !showBatchFolderDropdown">
+            移入文件夾
+          </button>
+          <div v-if="showBatchFolderDropdown" class="batch-folder-dropdown">
+            <div class="dropdown-header">移動至：</div>
+            <div class="dropdown-item" @click="batchMoveToFolder(null)">根目錄</div>
+            <div
+              v-for="folder in folders"
+              :key="folder.id"
+              class="dropdown-item"
+              @click="batchMoveToFolder(folder.id)"
+            >{{ folder.name }}</div>
           </div>
-        </div>
-
-        <!-- 首頁 Toolbar 內的上傳進度展示 (PC端適用) -->
-        <div v-if="uploadStore.isUploading" class="toolbar-upload-indicator" @click="router.push({ name: 'upload' })" title="點擊查看上傳詳情">
-          <div class="spinner-small"></div>
-          <span>上傳中... {{ uploadStore.progress }}% ({{ uploadStore.filesCount }} 部影片)</span>
-        </div>
-
-        <div class="batch-controls">
-          <button
-            class="btn"
-            type="button"
-            @click="toggleSelectMode"
-          >
-            {{ selectMode ? '取消多選' : '多選影片' }}
-          </button>
-          
-          <!-- 批量刪除 -->
-          <button
-            v-if="selectMode && selectedIds.length > 0"
-            class="btn danger bulk-delete-btn"
-            type="button"
-            @click="deleteSelected"
-          >
-            確認刪除 ({{ selectedIds.length }})
-          </button>
-
-          <!-- 批量移動至資料夾 -->
-          <div v-if="selectMode && selectedIds.length > 0" class="batch-folder-container">
-            <button
-              class="btn"
-              type="button"
-              @click="showBatchFolderDropdown = !showBatchFolderDropdown"
-            >
-              移入資料夾 ({{ selectedIds.length }})
-            </button>
-            <div v-if="showBatchFolderDropdown" class="batch-folder-dropdown">
-              <div class="dropdown-header">移動選取影片至：</div>
-              <div class="dropdown-item" @click="batchMoveToFolder(null)">根目錄 (無)</div>
-              <div
-                v-for="folder in folders"
-                :key="folder.id"
-                class="dropdown-item"
-                @click="batchMoveToFolder(folder.id)"
-              >
-                {{ folder.name }}
-              </div>
-            </div>
-          </div>
-
-          <button
-            class="btn danger"
-            type="button"
-            @click="deleteAll"
-          >
-            一鍵全部刪除
-          </button>
         </div>
       </div>
 
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-      <div v-if="loading" class="empty-state">載入中...</div>
+      <!-- ===== 列表視圖 ===== -->
+      <template v-if="viewMode === 'list'">
+        <!-- 欄位標題列 -->
+        <div class="list-header" :class="{ 'with-check': selectMode }">
+          <div class="col-check" v-if="selectMode">
+            <!-- 全選 checkbox -->
+            <input
+              type="checkbox"
+              :checked="selectedIds.length === videos.length && videos.length > 0"
+              @change="(e) => { if (e.target.checked) { selectedIds = videos.map(v => v.id); selectedFolderIds = sortedFolders.map(f => f.id); } else { selectedIds = []; selectedFolderIds = []; } }"
+              @click.stop
+            />
+          </div>
+          <div class="col-name" @click="toggleSort('title')">
+            名稱
+            <span class="sort-arrow">{{ sortBy === 'title' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}</span>
+          </div>
+          <div class="col-date" @click="toggleSort('createdAt')">
+            修改時間
+            <span class="sort-arrow">{{ sortBy === 'createdAt' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}</span>
+          </div>
+          <div class="col-size" @click="toggleSort('fileSize')">
+            大小
+            <span class="sort-arrow">{{ sortBy === 'fileSize' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}</span>
+          </div>
+          <div class="col-actions-header"></div>
+        </div>
 
-      <template v-else>
-        <div v-if="videos.length === 0" class="empty-state">此資料夾內目前沒有任何影片。</div>
+        <!-- 資料夾行（根目錄才顯示） -->
+        <template v-if="currentFolderId === null">
+          <div
+            v-for="folder in sortedFolders"
+            :key="'folder-' + folder.id"
+            class="list-row folder-row"
+            :class="{ 'with-check': selectMode, selected: selectedFolderIds.includes(folder.id) }"
+            @click="selectMode ? handleFolderSelect(folder.id, !selectedFolderIds.includes(folder.id)) : enterFolder(folder)"
+          >
+            <div class="col-check" v-if="selectMode" @click.stop>
+              <input
+                type="checkbox"
+                :checked="selectedFolderIds.includes(folder.id)"
+                @change="handleFolderSelect(folder.id, $event.target.checked)"
+              />
+            </div>
+            <div class="col-name">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="row-icon folder-icon-color">
+                <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+              </svg>
+              <span class="row-name">{{ folder.name }}</span>
+            </div>
+            <div class="col-date">{{ formatDate(folder.createdAt) }}</div>
+            <div class="col-size">—</div>
+            <div class="col-actions" @click.stop>
+              <button class="row-action-btn" @click="editFolder(folder)" title="重新命名">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+              </button>
+              <button class="row-action-btn delete" @click="deleteFolder(folder)" title="刪除">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </template>
 
-        <div v-else class="video-grid" :class="{ 'list-view': viewMode === 'list' }">
-          <VideoCard
+        <!-- 影片行 -->
+        <div v-if="loading" class="empty-state">載入中...</div>
+        <template v-else>
+          <div v-if="videos.length === 0 && (currentFolderId !== null || sortedFolders.length === 0)" class="empty-state">
+            此處目前沒有任何影片。
+          </div>
+          <div
             v-for="video in videos"
             :key="video.id"
-            :video="video"
-            :show-checkbox="selectMode"
-            :selected="selectedIds.includes(video.id)"
-            :folders="folders"
-            @select="handleSelect"
-            @refresh="load(page, true)"
-          />
-        </div>
-
-        <div v-if="totalPages > 1" class="pagination">
-          <button class="btn" type="button" :disabled="page === 0" @click="prevPage">上一頁</button>
-          <span>{{ page + 1 }} / {{ totalPages }}</span>
-          <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
-        </div>
+            class="list-row video-row"
+            :class="{ 'with-check': selectMode, selected: selectedIds.includes(video.id) }"
+            @click="goToVideo(video)"
+          >
+            <div class="col-check" v-if="selectMode" @click.stop>
+              <input type="checkbox" :checked="selectedIds.includes(video.id)" @change="handleSelect(video.id, $event.target.checked)" />
+            </div>
+            <div class="col-name">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="row-icon video-icon-color">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+              </svg>
+              <span class="row-name">{{ video.title }}</span>
+              <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">上傳中</span>
+            </div>
+            <div class="col-date">{{ formatDate(video.createdAt) }}</div>
+            <div class="col-size">{{ formatSize(video.fileSize) }}</div>
+            <div class="col-actions" @click.stop>
+              <button class="row-action-btn delete" title="刪除影片" @click="deleteOneVideo(video)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </template>
       </template>
+
+      <!-- ===== 格狀視圖 ===== -->
+      <template v-else>
+        <!-- 資料夾格狀（根目錄才顯示） -->
+        <template v-if="currentFolderId === null && sortedFolders.length > 0">
+          <div class="section-label">文件夾</div>
+          <div class="folders-grid">
+            <div
+              v-for="folder in sortedFolders"
+              :key="folder.id"
+              class="folder-card"
+              :class="{ selected: selectedFolderIds.includes(folder.id) }"
+              @click="selectMode ? handleFolderSelect(folder.id, !selectedFolderIds.includes(folder.id)) : enterFolder(folder)"
+            >
+              <!-- 多選模式：左上角 checkbox -->
+              <div v-if="selectMode" class="folder-card-check" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="selectedFolderIds.includes(folder.id)"
+                  @change="handleFolderSelect(folder.id, $event.target.checked)"
+                />
+              </div>
+              <div class="folder-card-icon">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                  <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                </svg>
+              </div>
+              <div class="folder-card-info">
+                <div class="folder-card-name" :title="folder.name">{{ folder.name }}</div>
+                <div class="folder-card-date">{{ formatDate(folder.createdAt) }}</div>
+              </div>
+              <div class="folder-card-actions" @click.stop>
+                <button class="row-action-btn" @click="editFolder(folder)" title="重新命名">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                  </svg>
+                </button>
+                <button class="row-action-btn delete" @click="deleteFolder(folder)" title="刪除">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="videos.length > 0" class="section-label" style="margin-top: 24px;">影片</div>
+        </template>
+
+        <div v-if="loading" class="empty-state">載入中...</div>
+        <template v-else>
+          <div v-if="videos.length === 0 && (currentFolderId !== null || sortedFolders.length === 0)" class="empty-state">
+            此處目前沒有任何影片。
+          </div>
+          <div v-if="videos.length > 0" class="video-grid">
+            <VideoCard
+              v-for="video in videos"
+              :key="video.id"
+              :video="video"
+              :show-checkbox="selectMode"
+              :selected="selectedIds.includes(video.id)"
+              :folders="folders"
+              @select="handleSelect"
+              @refresh="load(page, true)"
+            />
+          </div>
+        </template>
+      </template>
+
+      <!-- 分頁 -->
+      <div v-if="totalPages > 1" class="pagination">
+        <button class="btn" type="button" :disabled="page === 0" @click="prevPage">上一頁</button>
+        <span>{{ page + 1 }} / {{ totalPages }}</span>
+        <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
+      </div>
+
+      <!-- 一鍵刪除全部 (危險操作，收到底部) -->
+      <div class="danger-zone">
+        <button class="btn danger small-btn" type="button" @click="deleteAll">一鍵刪除全部</button>
+      </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-.view-mode-toggle {
-  display: flex;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 2px;
-  margin-left: 8px;
-}
-
-.view-mode-toggle .icon-btn {
-  background: transparent;
-  border: none;
-  color: #aaa;
-  padding: 6px 12px;
-  font-size: 13px;
-  border-radius: 4px;
-  cursor: pointer;
+/* ===== 頂部操作列 ===== */
+.action-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s ease;
+  justify-content: space-between;
+  padding: 16px 0 12px;
+  gap: 12px;
 }
 
-.view-mode-toggle .icon-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+.action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.view-mode-toggle .icon-btn.active {
-  color: #fff;
-  background: var(--accent-blue);
-}
-
-.toolbar-upload-indicator {
+.action-bar-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(37, 99, 235, 0.1);
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  padding: 6px 14px;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
   border-radius: 20px;
-  font-size: 13px;
-  color: var(--accent-blue);
+  font-size: 14px;
   font-weight: 500;
-  backdrop-filter: blur(4px);
   cursor: pointer;
-  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.toolbar-upload-indicator:hover {
-  background: rgba(37, 99, 235, 0.18);
-  border-color: rgba(37, 99, 235, 0.45);
-  transform: scale(1.02);
+.action-btn:hover {
+  background: var(--border-color);
 }
 
-.spinner-small {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(37, 99, 235, 0.2);
-  border-left-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: spin-small 1s linear infinite;
+.action-btn.primary {
+  background: #0066cc;
+  color: #fff;
+  border-color: #0066cc;
 }
 
-@keyframes spin-small {
-  to { transform: rotate(360deg); }
+.action-btn.primary:hover {
+  background: #0052a3;
+  border-color: #0052a3;
 }
 
-/* 麵包屑樣式 */
-.breadcrumb-container {
+.action-btn.danger {
+  background: transparent;
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.action-btn.danger:hover {
+  background: rgba(211, 47, 47, 0.08);
+}
+
+.search-box {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.btn-back {
+  gap: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  padding: 6px 12px;
+  border-radius: 20px;
+  padding: 7px 16px;
+  width: 240px;
+  transition: all 0.15s ease;
+}
+
+.search-box:focus-within {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.15);
+}
+
+.search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
   font-size: 13px;
   color: var(--text-primary);
-  border-radius: var(--border-radius-md);
-  cursor: pointer;
-  transition: var(--transition-smooth);
+  width: 100%;
 }
 
-.btn-back:hover {
-  background: var(--border-color);
-  border-color: var(--text-muted);
+.search-box input::placeholder {
+  color: var(--text-muted);
 }
 
-.breadcrumb {
+/* ===== 麵包屑 / 導航列 ===== */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.nav-bar-left {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -596,206 +825,481 @@ function formatDate(value) {
   color: var(--text-secondary);
 }
 
+.nav-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-back-btn {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.nav-back-btn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.nav-separator {
+  color: var(--border-color);
+  font-weight: 300;
+  margin: 0 2px;
+}
+
+.breadcrumb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .crumb-link {
   cursor: pointer;
-  color: var(--accent-blue);
-  transition: color 0.2s;
+  color: #0066cc;
+  transition: color 0.15s ease;
 }
 
 .crumb-link:hover {
-  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
-.crumb-separator {
+.crumb-sep {
   color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
 }
 
 .crumb-current {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.crumb-arrow {
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.nav-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-icon-btn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.nav-icon-btn.active {
+  color: #0066cc;
+  background: rgba(0, 102, 204, 0.1);
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.upload-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #0066cc;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 10px;
+  background: rgba(0, 102, 204, 0.08);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 102, 204, 0.2);
+}
+
+.spinner-tiny {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(0, 102, 204, 0.2);
+  border-left-color: #0066cc;
+  border-radius: 50%;
+  animation: spin-tiny 0.8s linear infinite;
+}
+
+@keyframes spin-tiny {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 批量操作列 ===== */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(0, 102, 204, 0.06);
+  border: 1px solid rgba(0, 102, 204, 0.15);
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.batch-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0066cc;
+  margin-right: auto;
+}
+
+/* ===== 列表欄位標題 ===== */
+/* ===== 列表行 ===== */
+.list-header,
+.list-row {
+  display: grid;
+  grid-template-columns: 1fr 180px 100px 60px;
+  padding: 9px 12px;
+  align-items: center;
+}
+
+.list-header.with-check,
+.list-row.with-check {
+  grid-template-columns: 32px 1fr 180px 100px 60px;
+}
+
+.list-header {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  user-select: none;
+  padding: 8px 12px;
+}
+
+.list-row {
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.list-header .col-name,
+.list-header .col-date,
+.list-header .col-size {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.list-header .col-name:hover,
+.list-header .col-date:hover,
+.list-header .col-size:hover {
+  color: var(--text-primary);
+}
+
+.sort-arrow {
+  font-size: 11px;
+  color: #0066cc;
+}
+
+.col-actions-header {
+  /* placeholder for actions column in header */
+}
+
+.list-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.list-row.selected {
+  background: rgba(0, 102, 204, 0.06);
+}
+
+.col-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   color: var(--text-primary);
   font-weight: 500;
 }
 
-/* 資料夾區塊樣式 */
-.folders-section {
-  margin-bottom: 32px;
+.row-icon {
+  flex-shrink: 0;
 }
 
-.section-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
+.folder-icon-color {
+  color: #f9a825;
 }
 
-.section-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+.video-icon-color {
+  color: #0066cc;
 }
 
-.folder-sorting {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
+.row-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-date {
   color: var(--text-secondary);
-}
-
-.folder-sorting .select-input {
-  padding: 4px 8px;
   font-size: 12px;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
+.col-size {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.col-check {
+  display: flex;
+  align-items: center;
+  width: 32px;
+}
+
+.col-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.list-row:hover .col-actions {
+  opacity: 1;
+}
+
+.row-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.row-action-btn:hover {
+  background: var(--border-color);
   color: var(--text-primary);
+}
+
+.row-action-btn.delete:hover {
+  background: rgba(211, 47, 47, 0.1);
+  color: var(--danger-color);
+}
+
+.status-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.uploading {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ===== 格狀視圖：文件夾 ===== */
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 4px 8px;
 }
 
 .folders-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .folder-card {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 12px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  border-radius: 8px;
   cursor: pointer;
   position: relative;
-  transition: var(--transition-smooth);
+  transition: all 0.15s ease;
 }
 
 .folder-card:hover {
-  border-color: var(--border-hover);
-  background-color: var(--bg-secondary);
+  border-color: #0066cc;
+  box-shadow: 0 2px 8px rgba(0, 102, 204, 0.12);
 }
 
-.folder-icon {
-  font-size: 24px;
-  margin-right: 12px;
+.folder-card.selected {
+  border-color: #0066cc;
+  background: rgba(0, 102, 204, 0.05);
 }
 
-.folder-info {
+.folder-card-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.folder-card-icon {
+  color: #f9a825;
+  flex-shrink: 0;
+}
+
+.folder-card-info {
   flex: 1;
   min-width: 0;
 }
 
-.folder-name {
-  font-size: 14px;
+.folder-card-name {
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 16px;
 }
 
-.folder-date {
+.folder-card-date {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
 }
 
-.folder-actions {
+.folder-card-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 8px;
+  top: 8px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.folder-action-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  font-size: 11px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+.folder-card:hover .folder-card-actions {
+  opacity: 1;
 }
 
-.folder-action-btn:hover {
-  color: var(--text-primary);
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.folder-action-btn.delete:hover {
-  color: var(--danger-color);
-  background-color: rgba(220, 38, 38, 0.1);
-}
-
-.folders-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 24px;
-  color: var(--text-muted);
-  border: 1px dashed var(--border-color);
-  border-radius: var(--border-radius-md);
-  font-size: 13px;
-}
-
-/* 批量移動下拉選單樣式 */
+/* ===== 批量下拉選單 ===== */
 .batch-folder-container {
   position: relative;
-  display: inline-block;
 }
 
 .batch-folder-dropdown {
   position: absolute;
   left: 0;
-  top: 100%;
+  top: calc(100% + 4px);
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 8px;
   min-width: 160px;
-  box-shadow: var(--shadow-premium);
-  z-index: 20;
-  margin-top: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
   overflow: hidden;
 }
 
-.batch-folder-dropdown .dropdown-header {
+.dropdown-header {
   padding: 8px 12px;
   font-size: 11px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border-color);
-  background-color: rgba(255, 255, 255, 0.02);
   font-weight: 500;
-  white-space: nowrap;
 }
 
-.batch-folder-dropdown .dropdown-item {
-  padding: 10px 14px;
+.dropdown-item {
+  padding: 9px 14px;
   font-size: 13px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transition: background 0.12s ease;
 }
 
-.batch-folder-dropdown .dropdown-item:hover {
-  background-color: var(--border-color);
+.dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
+/* ===== 危險區 / 分頁 ===== */
+.danger-zone {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0 8px;
+}
+
+.small-btn {
+  font-size: 12px;
+  padding: 6px 14px;
+  opacity: 0.5;
+}
+
+.small-btn:hover {
+  opacity: 1;
+}
+
+/* ===== 格狀影片 ===== */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding-top: 8px;
+}
+
+/* ===== 響應式 ===== */
 @media (max-width: 768px) {
-  .toolbar-upload-indicator {
+  .search-box {
+    width: 160px;
+  }
+
+  .list-row,
+  .list-header {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .col-size,
+  .col-actions {
     display: none;
   }
+
+  .action-bar {
+    flex-wrap: wrap;
+  }
+
+  .folders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
 }
+
 </style>

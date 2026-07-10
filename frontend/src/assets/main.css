@@ -1,25 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #0f0f0f;
-  --bg-card: #0f0f0f;
-  --border-color: #272727;
-  --border-hover: #3f3f3f;
-  --text-primary: #f1f1f1;
-  --text-secondary: #aaaaaa;
-  --text-muted: #606060;
-  --accent-blue: #3ea6ff;
-  --accent-hover: #65b8ff;
-  --danger-color: #ff4e45;
-  --success-color: #2ba640;
-  --font-sans: 'Roboto', system-ui, -apple-system, sans-serif;
-  --font-brand: 'Roboto', system-ui, -apple-system, sans-serif;
-  --transition-smooth: all 0.2s ease;
-  --shadow-premium: none;
+  --bg-primary: #f5f6f9;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --border-color: #d1d5db; /* darker border for high contrast */
+  --border-hover: #9ca3af;
+  --text-primary: #111827; /* very dark gray for high contrast */
+  --text-secondary: #374151; /* high contrast secondary text */
+  --text-muted: #4b5563; /* high contrast muted text */
+  --accent-blue: #0066cc; /* deep blue for high-contrast visibility */
+  --accent-hover: #0052a3;
+  --danger-color: #d32f2f; /* deep red for high contrast */
+  --success-color: #2e7d32;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-brand: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --transition-smooth: all 0.15s ease;
+  --shadow-premium: 0 2px 8px rgba(0, 0, 0, 0.05);
   --border-radius-sm: 4px;
-  --border-radius-md: 18px;
-  --border-radius-lg: 12px;
+  --border-radius-md: 20px;
+  --border-radius-lg: 8px;
 }
 
 * {
@@ -91,8 +91,9 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 24px;
+  padding: 10px 24px;
   background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -120,7 +121,7 @@ main {
   max-width: 520px;
   display: flex;
   align-items: center;
-  background: #121212;
+  background: rgba(0, 0, 0, 0.05);
   border: 1px solid var(--border-color);
   border-radius: 40px;
   padding: 0 0 0 16px;
@@ -152,7 +153,7 @@ main {
   height: 100%;
   border: none;
   border-left: 1px solid var(--border-color);
-  background: #222222;
+  background: rgba(0, 0, 0, 0.08);
   color: var(--text-primary);
   cursor: pointer;
   font-size: 14px;
@@ -161,7 +162,7 @@ main {
 }
 
 .navbar button.search-btn:hover {
-  background: #2d2d2d;
+  background: rgba(0, 0, 0, 0.13);
 }
 
 .navbar .nav-actions {
@@ -182,9 +183,9 @@ main {
 .btn {
   padding: 8px 16px;
   border-radius: var(--border-radius-md);
-  border: none;
+  border: 1px solid var(--border-color);
   color: var(--text-primary);
-  background: #272727;
+  background: var(--bg-card);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -196,7 +197,7 @@ main {
 }
 
 .btn:hover {
-  background: #3f3f3f;
+  background: var(--border-color);
 }
 
 .btn:active {
@@ -204,17 +205,20 @@ main {
 }
 
 .btn.primary {
-  background: #f1f1f1;
-  color: #0f0f0f;
+  background: #0066cc;
+  color: #fff;
+  border-color: #0066cc;
   font-weight: 500;
 }
 
 .btn.primary:hover {
-  background: #d9d9d9;
+  background: #0052a3;
+  border-color: #0052a3;
 }
 
 .btn.danger {
-  background: rgba(255, 78, 69, 0.1);
+  background: transparent;
+  border-color: var(--danger-color);
   color: var(--danger-color);
 }
 

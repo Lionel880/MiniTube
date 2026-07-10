@@ -1,10 +1,11 @@
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../store/auth";
 import { useUploadStore } from "../store/upload";
 import axios from "axios";
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const uploadStore = useUploadStore();
@@ -115,14 +116,16 @@ function clearApiUrl() {
       </div>
     </div>
 
-    <form @submit.prevent="onSearch">
+    <!-- 搜尋框 (首頁時隱藏，避免重複) -->
+    <form v-if="route.name !== 'home'" @submit.prevent="onSearch">
       <input v-model="keyword" type="text" placeholder="搜尋影片" />
       <button class="search-btn" type="submit">搜尋</button>
     </form>
 
     <div class="nav-actions">
       <template v-if="authStore.isLoggedIn">
-        <RouterLink class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
+        <!-- 上傳按鈕 (首頁時隱藏，避免重複) -->
+        <RouterLink v-if="route.name !== 'home'" class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
         <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
         <button class="btn danger" type="button" @click="onLogout">登出</button>
       </template>
