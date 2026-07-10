@@ -276,10 +276,13 @@ function formatDate(value) {
 
     <template v-else>
       <!-- 麵包屑導航（當在資料夾內時） -->
-      <div v-if="currentFolderId !== null" class="breadcrumb">
-        <span class="crumb-link" @click="exitFolder">全部影片</span>
-        <span class="crumb-separator">/</span>
-        <span class="crumb-current">{{ currentFolderName }}</span>
+      <div v-if="currentFolderId !== null" class="breadcrumb-container">
+        <button class="btn btn-back" @click="exitFolder">⬅ 返回上一頁</button>
+        <div class="breadcrumb">
+          <span class="crumb-link" @click="exitFolder">全部影片</span>
+          <span class="crumb-separator">/</span>
+          <span class="crumb-current">{{ currentFolderName }}</span>
+        </div>
       </div>
 
       <!-- 資料夾列表區塊（僅在根目錄顯示） -->
@@ -359,7 +362,7 @@ function formatDate(value) {
             type="button"
             @click="toggleSelectMode"
           >
-            {{ selectMode ? '取消選取' : '🗑️ 選取刪除' }}
+            {{ selectMode ? '取消多選' : '☑️ 多選影片' }}
           </button>
           
           <!-- 批量刪除 -->
@@ -505,12 +508,34 @@ function formatDate(value) {
 }
 
 /* 麵包屑樣式 */
+.breadcrumb-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.btn-back {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-back:hover {
+  background: var(--border-color);
+  border-color: var(--text-muted);
+}
+
 .breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  margin-bottom: 24px;
   color: var(--text-secondary);
 }
 
