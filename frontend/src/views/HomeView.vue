@@ -314,14 +314,33 @@ async function deleteOneVideo(video) {
   }
 }
 
-async function deleteAll() {
-  if (!confirm("⚠️ 確定要刪除您帳號中所有的影片嗎？此操作不可逆！")) return;
+async function clearCurrentDirectoryVideos() {
+  const dirName = currentFolderId.value === null ? "全部影片（根目錄）" : `資料夾「${currentFolderName.value}」`;
+  if (!confirm(`⚠️ 警告：確定要刪除當前 ${dirName} 下的所有影片嗎？\n此操作不可逆，將會刪除該目錄下的所有實體影片檔案！`)) return;
+
+  loading.value = true;
   try {
-    await deleteAllVideos();
-    selectMode.value = false;
+    const folderQueryId = currentFolderId.value === null ? "root" : currentFolderId.value.toString();
+    const res = await listVideos({
+      folderId: folderQueryId,
+      page: 0,
+      size: 9999
+    });
+
+    const idsToDelete = res.content.map(v => v.id);
+    if (idsToDelete.length === 0) {
+      alert("當前目錄下沒有任何影片可供刪除。");
+      loading.value = false;
+      return;
+    }
+
+    await batchDeleteVideos(idsToDelete);
     load(0);
+    alert(`已成功刪除當前 ${dirName} 下的 ${idsToDelete.length} 部影片。`);
   } catch (err) {
-    alert("一鍵刪除失敗：" + err.message);
+    alert("一鍵刪除失敗：" + (err.response?.data?.message || err.message));
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -469,9 +488,6 @@ function formatDate(value) {
             >全部影片</span>
             <span v-if="currentFolderId !== null" class="crumb-sep">›</span>
             <span class="crumb-current">{{ currentFolderId !== null ? currentFolderName : '全部影片' }}</span>
-            <svg v-if="currentFolderId === null" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="crumb-arrow">
-              <path d="M7 10l5 5 5-5z"/>
-            </svg>
           </div>
         </div>
 
@@ -481,6 +497,13 @@ function formatDate(value) {
             <div class="spinner-tiny"></div>
             <span>{{ uploadStore.progress }}%</span>
           </div>
+
+          <!-- 一鍵刪除當前目錄下所有影片 -->
+          <button class="nav-icon-btn" style="color: var(--danger-color);" @click="clearCurrentDirectoryVideos" title="一鍵清空此目錄影片">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+          </button>
 
           <!-- 刷新 -->
           <button class="nav-icon-btn" @click="load(0)" title="刷新">
@@ -714,10 +737,6 @@ function formatDate(value) {
         <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
       </div>
 
-      <!-- 一鍵刪除全部 (危險操作，收到底部) -->
-      <div class="danger-zone">
-        <button class="btn danger small-btn" type="button" @click="deleteAll">一鍵刪除全部</button>
-      </div>
     </template>
   </div>
 </template>
@@ -1205,9 +1224,8 @@ function formatDate(value) {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.9);
+  background: transparent;
   border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .folder-card-icon {
@@ -1238,7 +1256,7 @@ function formatDate(value) {
 .folder-card-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   position: absolute;
   right: 8px;
   top: 8px;
@@ -1248,6 +1266,35 @@ function formatDate(value) {
 
 .folder-card:hover .folder-card-actions {
   opacity: 1;
+}
+
+/* 提高在資料夾卡片內的按鈕對比度，解決暗底看不清的問題 */
+.folder-card-actions .row-action-btn {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.folder-card-actions .row-action-btn:hover {
+  background: var(--accent-blue) !important;
+  color: #fff !important;
+}
+
+.folder-card-actions .row-action-btn.delete {
+  color: #ff453a !important;
+  background: rgba(255, 69, 58, 0.15) !important;
+}
+
+.folder-card-actions .row-action-btn.delete:hover {
+  background: #ff453a !important;
+  color: #fff !important;
 }
 
 /* ===== 批量下拉選單 ===== */
@@ -1325,19 +1372,21 @@ function formatDate(value) {
 
   .list-row,
   .list-header {
-    grid-template-columns: 1fr 90px;
+    grid-template-columns: 1fr 85px 70px;
   }
 
   .list-row.with-check,
   .list-header.with-check {
-    grid-template-columns: 32px 1fr 90px;
+    grid-template-columns: 32px 1fr 85px 70px;
   }
 
-  .col-size,
-  .list-header .col-size,
   .col-actions,
   .col-actions-header {
     display: none !important;
+  }
+
+  .folder-card-actions {
+    opacity: 1 !important;
   }
 
   .action-bar {
