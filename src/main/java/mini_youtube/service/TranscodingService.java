@@ -120,12 +120,7 @@ public class TranscodingService {
                         videoRepository.save(video);
                         
                         // 刪除原始上傳的檔案
-                        try {
-                            Files.deleteIfExists(sourcePath);
-                            log.info("成功清理原始影片檔案: {}", storedFilename);
-                        } catch (IOException e) {
-                            log.warn("清理原始檔案失敗: {}", storedFilename, e);
-                        }
+                        safeDeleteSourceFile(sourcePath, storedFilename);
                     } else {
                         log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
                         String coverFilename = generateCover(sourcePath);
@@ -157,12 +152,7 @@ public class TranscodingService {
 
                 // 刪除原始上傳的檔案 (如果是不同檔案才刪除)
                 if (!storedFilename.equals(newStoredFilename)) {
-                    try {
-                        Files.deleteIfExists(sourcePath);
-                        log.info("成功清理原始影片檔案: {}", storedFilename);
-                    } catch (IOException e) {
-                        log.warn("清理原始檔案失敗: {}", storedFilename, e);
-                    }
+                    safeDeleteSourceFile(sourcePath, storedFilename);
                 }
 
             } catch (Exception e) {
@@ -216,6 +206,34 @@ public class TranscodingService {
             log.error("執行影片轉碼命令發生異常", e);
         }
         return false;
+    }
+
+    private void safeDeleteSourceFile(Path path, String storedFilename) {
+        // 先進行垃圾回收，協助 JVM 釋放對實體檔案的控制鎖（尤其是 Jave MultimediaObject 產生的鎖）
+        System.gc();
+        
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                if (Files.deleteIfExists(path)) {
+                    log.info("成功清理原始影片檔案: {}", storedFilename);
+                    return;
+                } else {
+                    log.info("原始影片檔案不存在或已被清理: {}", storedFilename);
+                    return;
+                }
+            } catch (IOException e) {
+                log.warn("清理原始檔案失敗 (嘗試第 {}/{} 次): {}", (i + 1), maxRetries, e.getMessage());
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                System.gc(); // 再次嘗試回收
+            }
+        }
+        log.error("無法清理原始影片檔案，已達最大重試次數: {}", storedFilename);
     }
 
     private String generateCover(Path videoPath) {
