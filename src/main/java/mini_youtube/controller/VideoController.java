@@ -98,6 +98,15 @@ public class VideoController {
         return videoService.moveVideoToFolder(id, authentication.getName(), folderId);
     }
 
+    @PutMapping("/batch/folder")
+    public ResponseEntity<Void> batchMoveVideosToFolder(
+            @RequestBody List<Long> ids,
+            @RequestParam(value = "folderId", required = false) Long folderId,
+            Authentication authentication) {
+        videoService.batchMoveVideosToFolder(ids, authentication.getName(), folderId);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{id}")
     public VideoDetailResponse getById(@PathVariable Long id, Authentication authentication) {
         return videoService.getById(id, currentUsername(authentication));

@@ -30,13 +30,15 @@ const sortDir = ref(localStorage.getItem("minitube_sort_dir") || "desc");
 // 瀏覽模式
 const viewMode = ref(localStorage.getItem("minitube_view_mode") || "grid");
 
-// 批量刪除選擇狀態
+// 批量刪除與移動選擇狀態
 const selectedIds = ref([]);
 const selectMode = ref(false);
+const showBatchFolderDropdown = ref(false);
 
 function toggleSelectMode() {
   selectMode.value = !selectMode.value;
   selectedIds.value = [];
+  showBatchFolderDropdown.value = false;
 }
 
 async function loadFolders() {
@@ -57,6 +59,17 @@ async function createFolder() {
     await loadFolders();
   } catch (err) {
     alert("建立資料夾失敗：" + (err.response?.data?.message || err.message));
+  }
+}
+
+async function editFolder(folder) {
+  const name = prompt("請輸入新的資料夾名稱：", folder.name);
+  if (!name || !name.trim() || name.trim() === folder.name) return;
+  try {
+    await http.put(`/folders/${folder.id}`, { name: name.trim() });
+    await loadFolders();
+  } catch (err) {
+    alert("修改資料夾名稱失敗：" + (err.response?.data?.message || err.message));
   }
 }
 
@@ -84,6 +97,18 @@ function exitFolder() {
   currentFolderName.value = "";
   loadFolders();
   load(0);
+}
+
+async function batchMoveToFolder(folderId) {
+  showBatchFolderDropdown.value = false;
+  try {
+    const url = "/videos/batch/folder" + (folderId ? `?folderId=${folderId}` : "");
+    await http.put(url, selectedIds.value);
+    selectMode.value = false;
+    load(page.value);
+  } catch (err) {
+    alert("批量移動影片失敗：" + (err.response?.data?.message || err.message));
+  }
 }
 
 async function load(p = 0, silent = false) {
@@ -136,7 +161,16 @@ function syncPolling() {
   }
 }
 
-onUnmounted(stopPolling);
+function handleOutsideClick(e) {
+  if (showBatchFolderDropdown.value && !e.target.closest(".batch-folder-container")) {
+    showBatchFolderDropdown.value = false;
+  }
+}
+
+onUnmounted(() => {
+  stopPolling();
+  window.removeEventListener("click", handleOutsideClick);
+});
 
 function handleSelect(id, checked) {
   if (checked) {
@@ -215,6 +249,7 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener("click", handleOutsideClick);
   if (authStore.isLoggedIn) {
     loadFolders();
     load(0);
@@ -265,9 +300,10 @@ function formatDate(value) {
               <div class="folder-name" :title="folder.name">{{ folder.name }}</div>
               <div class="folder-date">{{ formatDate(folder.createdAt) }}</div>
             </div>
-            <button class="folder-delete-btn" @click.stop="deleteFolder(folder)" title="刪除資料夾">
-              ✕
-            </button>
+            <div class="folder-actions" @click.stop>
+              <button class="folder-action-btn" @click="editFolder(folder)" title="修改資料夾名稱">✏️</button>
+              <button class="folder-action-btn delete" @click="deleteFolder(folder)" title="刪除資料夾">✕</button>
+            </div>
           </div>
           <div v-if="folders.length === 0" class="folders-empty">
             目前沒有資料夾，點擊上方按鈕建立新資料夾。
@@ -325,6 +361,8 @@ function formatDate(value) {
           >
             {{ selectMode ? '取消選取' : '🗑️ 選取刪除' }}
           </button>
+          
+          <!-- 批量刪除 -->
           <button
             v-if="selectMode && selectedIds.length > 0"
             class="btn danger bulk-delete-btn"
@@ -333,6 +371,30 @@ function formatDate(value) {
           >
             確認刪除 ({{ selectedIds.length }})
           </button>
+
+          <!-- 批量移動至資料夾 -->
+          <div v-if="selectMode && selectedIds.length > 0" class="batch-folder-container">
+            <button
+              class="btn"
+              type="button"
+              @click="showBatchFolderDropdown = !showBatchFolderDropdown"
+            >
+              📁 移入資料夾 ({{ selectedIds.length }})
+            </button>
+            <div v-if="showBatchFolderDropdown" class="batch-folder-dropdown">
+              <div class="dropdown-header">移動選取影片至：</div>
+              <div class="dropdown-item" @click="batchMoveToFolder(null)">根目錄 (無)</div>
+              <div
+                v-for="folder in folders"
+                :key="folder.id"
+                class="dropdown-item"
+                @click="batchMoveToFolder(folder.id)"
+              >
+                {{ folder.name }}
+              </div>
+            </div>
+          </div>
+
           <button
             class="btn danger"
             type="button"
@@ -529,6 +591,7 @@ function formatDate(value) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding-right: 16px;
 }
 
 .folder-date {
@@ -537,22 +600,36 @@ function formatDate(value) {
   margin-top: 2px;
 }
 
-.folder-delete-btn {
+.folder-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.folder-action-btn {
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
-  font-size: 12px;
+  font-size: 11px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  margin-left: 8px;
 }
 
-.folder-delete-btn:hover {
+.folder-action-btn:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.folder-action-btn.delete:hover {
   color: var(--danger-color);
   background-color: rgba(220, 38, 38, 0.1);
 }
@@ -565,6 +642,51 @@ function formatDate(value) {
   border: 1px dashed var(--border-color);
   border-radius: var(--border-radius-md);
   font-size: 13px;
+}
+
+/* 批量移動下拉選單樣式 */
+.batch-folder-container {
+  position: relative;
+  display: inline-block;
+}
+
+.batch-folder-dropdown {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  min-width: 160px;
+  box-shadow: var(--shadow-premium);
+  z-index: 20;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.batch-folder-dropdown .dropdown-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  background-color: rgba(255, 255, 255, 0.02);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.batch-folder-dropdown .dropdown-item {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-folder-dropdown .dropdown-item:hover {
+  background-color: var(--border-color);
 }
 
 @media (max-width: 768px) {

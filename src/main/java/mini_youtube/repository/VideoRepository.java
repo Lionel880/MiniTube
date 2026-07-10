@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import mini_youtube.entity.Folder;
 import mini_youtube.entity.User;
 import mini_youtube.entity.Video;
 
@@ -58,4 +59,8 @@ public interface VideoRepository extends JpaRepository<Video, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("update Video v set v.folder = null where v.folder.id = :folderId")
     void detachFolder(@Param("folderId") Long folderId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("update Video v set v.folder = :folder where v.id in :ids and v.uploader = :uploader")
+    void batchMoveToFolder(@Param("ids") java.util.List<Long> ids, @Param("folder") Folder folder, @Param("uploader") User uploader);
 }

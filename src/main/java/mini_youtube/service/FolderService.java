@@ -62,6 +62,25 @@ public class FolderService {
         folderRepository.delete(folder);
     }
 
+    @Transactional
+    public FolderResponse updateFolder(String username, Long folderId, CreateFolderRequest request) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new IllegalArgumentException("資料夾不存在"));
+
+        if (!folder.getOwner().getUsername().equals(username)) {
+            throw new IllegalArgumentException("您無權編輯此資料夾");
+        }
+
+        User owner = folder.getOwner();
+        if (!folder.getName().equals(request.getName()) && folderRepository.existsByNameAndOwner(request.getName(), owner)) {
+            throw new IllegalArgumentException("同名的資料夾已存在");
+        }
+
+        folder.setName(request.getName());
+        Folder saved = folderRepository.save(folder);
+        return mapToResponse(saved);
+    }
+
     private FolderResponse mapToResponse(Folder folder) {
         return FolderResponse.builder()
                 .id(folder.getId())

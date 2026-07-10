@@ -256,6 +256,21 @@ public class VideoService {
         return toDetailResponse(saved, username);
     }
 
+    @Transactional
+    public void batchMoveVideosToFolder(List<Long> ids, String username, Long folderId) {
+        if (ids == null || ids.isEmpty()) return;
+        User user = getUserOrThrow(username);
+        Folder folder = null;
+        if (folderId != null) {
+            folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new BusinessException("資料夾不存在"));
+            if (!folder.getOwner().getId().equals(user.getId())) {
+                throw new BusinessException("您無權限將影片放入此資料夾");
+            }
+        }
+        videoRepository.batchMoveToFolder(ids, folder, user);
+    }
+
     private Video getVideoOrThrow(Long id) {
         return videoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("找不到影片"));
