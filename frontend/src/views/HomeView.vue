@@ -167,6 +167,11 @@ function onLocalSearch() {
   load(0);
 }
 
+function clearSearch() {
+  searchKeyword.value = "";
+  onLocalSearch();
+}
+
 function goToVideo(video) {
   if (selectMode.value) {
     handleSelect(video.id, !selectedIds.value.includes(video.id));
@@ -434,6 +439,15 @@ function formatDate(value) {
               @input="onLocalSearch"
               @keydown.enter="onLocalSearch"
             />
+            <button
+              v-if="searchKeyword"
+              class="search-clear-btn"
+              type="button"
+              @click="clearSearch"
+              title="清除搜尋"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </div>
@@ -800,7 +814,25 @@ function formatDate(value) {
   outline: none;
   font-size: 13px;
   color: var(--text-primary);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-smooth);
+}
+
+.search-clear-btn:hover {
+  color: var(--text-primary);
 }
 
 .search-box input::placeholder {
@@ -1283,8 +1315,12 @@ function formatDate(value) {
 
 /* ===== 響應式 ===== */
 @media (max-width: 768px) {
+  .action-bar-right {
+    width: 100%;
+  }
+
   .search-box {
-    width: 160px;
+    width: 100% !important;
   }
 
   .list-row,
@@ -1298,12 +1334,15 @@ function formatDate(value) {
   }
 
   .col-size,
-  .col-actions {
-    display: none;
+  .list-header .col-size,
+  .col-actions,
+  .col-actions-header {
+    display: none !important;
   }
 
   .action-bar {
     flex-wrap: wrap;
+    gap: 8px;
   }
 
   .folders-grid {
