@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getVideo, updateVideo } from "../api/video";
 import { useAuthStore } from "../store/auth";
+import { useVideoStateStore } from "../store/videoState";
 
 // 影片狀態為 UPLOADING（背景轉碼中）時，多久自動重新查詢一次狀態
 const STATUS_POLL_INTERVAL_MS = 4000;
@@ -14,6 +15,7 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const videoStateStore = useVideoStateStore();
 import http from "../api/http";
 
 const getFullUrl = (relativeUrl) => {
@@ -63,6 +65,50 @@ function goBack() {
     router.push({ name: "home" });
   }
 }
+
+const videoPlayer = ref(null);
+
+const nextVideo = computed(() => {
+  if (!videoStateStore.videos || videoStateStore.videos.length === 0) return null;
+  const currentId = Number(props.id);
+  const index = videoStateStore.videos.findIndex(v => v.id === currentId);
+  if (index !== -1 && index + 1 < videoStateStore.videos.length) {
+    return videoStateStore.videos[index + 1];
+  }
+  return null;
+});
+
+function playNextVideo() {
+  if (nextVideo.value) {
+    router.push({
+      name: "video-detail",
+      params: { id: nextVideo.value.id },
+      query: { autoplay: "true" }
+    });
+  }
+}
+
+function onVideoEnded() {
+  if (nextVideo.value) {
+    playNextVideo();
+  }
+}
+
+// 監聽影片資訊載入，若 query 帶有 autoplay 則自動播放
+watch(
+  () => video.value,
+  (newVideo) => {
+    if (newVideo && route.query.autoplay === "true") {
+      setTimeout(() => {
+        if (videoPlayer.value) {
+          videoPlayer.value.play().catch(err => {
+            console.log("自動播放受阻：", err);
+          });
+        }
+      }, 300);
+    }
+  }
+);
 
 async function saveEdit() {
   if (!editTitle.value.trim()) {
@@ -159,7 +205,12 @@ onMounted(() => load());
 
 <template>
   <div class="page">
-    <button class="btn back-btn" type="button" @click="goBack">← 返回</button>
+    <div class="video-nav-header">
+      <button class="btn back-btn" type="button" @click="goBack">← 返回</button>
+      <button v-if="nextVideo" class="btn next-btn" type="button" @click="playNextVideo" :title="'下一部影片：' + nextVideo.title">
+        下一部 →
+      </button>
+    </div>
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
@@ -175,7 +226,17 @@ onMounted(() => load());
         <div v-else-if="video.status === 'FAILED'" class="transcoding-placeholder failed-placeholder">
           <p>❌ 影片轉碼失敗，請確認檔案格式是否損壞，並重新上傳。</p>
         </div>
-        <video v-else class="video-player" :src="getFullUrl(video.videoUrl)" controls playsinline webkit-playsinline preload="metadata"></video>
+        <video
+          v-else
+          ref="videoPlayer"
+          class="video-player"
+          :src="getFullUrl(video.videoUrl)"
+          controls
+          playsinline
+          webkit-playsinline
+          preload="metadata"
+          @ended="onVideoEnded"
+        ></video>
       </div>
 
       <div class="video-info-section">
@@ -266,8 +327,25 @@ onMounted(() => load());
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-.back-btn {
+.video-nav-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
+}
+.back-btn {
+  margin-bottom: 0;
+}
+.next-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  margin-bottom: 0;
+}
+.next-btn:hover {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
 }
 .title-row {
   display: flex;
