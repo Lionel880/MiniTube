@@ -1,6 +1,8 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
+import { useVideoStateStore } from "../store/videoState";
 import { listVideos, searchVideos, batchDeleteVideos, deleteAllVideos } from "../api/video";
 import { useAuthStore } from "../store/auth";
 import VideoCard from "../components/VideoCard.vue";
@@ -12,6 +14,17 @@ const STATUS_POLL_INTERVAL_MS = 5000;
 const router = useRouter();
 const authStore = useAuthStore();
 const uploadStore = useUploadStore();
+const videoStateStore = useVideoStateStore();
+const {
+  page,
+  size,
+  searchKeyword,
+  currentFolderId,
+  currentFolderName,
+  sortBy,
+  sortDir,
+  viewMode
+} = storeToRefs(videoStateStore);
 const videos = ref([]);
 const folders = ref([]);
 
@@ -34,21 +47,9 @@ const sortedFolders = computed(() => {
     return list.sort((a, b) => (new Date(a.createdAt) - new Date(b.createdAt)) * multiplier);
   }
 });
-const page = ref(0);
 const totalPages = ref(0);
 const loading = ref(false);
 const errorMessage = ref("");
-
-// 資料夾階層狀態
-const currentFolderId = ref(null); // null 代表根目錄，數字代表資料夾 ID
-const currentFolderName = ref("");
-
-// 影片排序狀態
-const sortBy = ref(localStorage.getItem("minitube_sort_by") || "createdAt");
-const sortDir = ref(localStorage.getItem("minitube_sort_dir") || "desc");
-
-// 瀏覽模式
-const viewMode = ref(localStorage.getItem("minitube_view_mode") || "grid");
 
 // 批量刪除與移動選擇狀態
 const selectedIds = ref([]);
@@ -144,7 +145,7 @@ async function batchMoveToFolder(folderId) {
   }
 }
 
-const searchKeyword = ref("");
+
 
 function toggleSort(field) {
   if (sortBy.value === field) {
@@ -202,7 +203,7 @@ async function load(p = 0, silent = false) {
         q: searchKeyword.value.trim(),
         folderId: currentFolderId.value === null ? "" : currentFolderId.value.toString(),
         page: p,
-        size: 12,
+        size: size.value,
         sortBy: sortBy.value,
         sortDir: sortDir.value,
       });
@@ -210,7 +211,7 @@ async function load(p = 0, silent = false) {
       data = await listVideos({
         folderId: folderQueryId,
         page: p,
-        size: 12,
+        size: size.value,
         sortBy: sortBy.value,
         sortDir: sortDir.value,
       });
@@ -362,6 +363,11 @@ watch(viewMode, (newVal) => {
   localStorage.setItem("minitube_view_mode", newVal);
 });
 
+watch(size, (newVal) => {
+  localStorage.setItem("minitube_page_size", newVal.toString());
+  load(0);
+});
+
 watch(
   () => uploadStore.isUploading,
   (newVal, oldVal) => {
@@ -389,14 +395,13 @@ watch(
     if (loggedIn) {
       restoreFolderState();
       loadFolders();
-      load(0);
+      load(page.value);
     } else {
       videos.value = [];
       folders.value = [];
       sessionStorage.removeItem("minitube_active_folder_id");
       sessionStorage.removeItem("minitube_active_folder_name");
-      currentFolderId.value = null;
-      currentFolderName.value = "";
+      videoStateStore.resetState();
       stopPolling();
     }
   }
@@ -407,7 +412,7 @@ onMounted(() => {
   if (authStore.isLoggedIn) {
     restoreFolderState();
     loadFolders();
-    load(0);
+    load(page.value);
   }
 });
 
@@ -496,6 +501,15 @@ function formatDate(value) {
           <div v-if="uploadStore.isUploading" class="upload-indicator" @click="router.push({ name: 'upload' })" title="點擊查看上傳詳情">
             <div class="spinner-tiny"></div>
             <span>{{ uploadStore.progress }}%</span>
+          </div>
+
+          <!-- 每頁筆數選擇 -->
+          <div class="size-select-container">
+            <select v-model="size" class="nav-select" title="每頁顯示影片數量">
+              <option :value="30">30 筆/頁</option>
+              <option :value="50">50 筆/頁</option>
+              <option :value="100">100 筆/頁</option>
+            </select>
           </div>
 
           <!-- 一鍵刪除當前目錄下所有影片 -->
@@ -939,6 +953,31 @@ function formatDate(value) {
 .crumb-arrow {
   color: var(--text-muted);
   margin-left: 2px;
+}
+
+.size-select-container {
+  display: flex;
+  align-items: center;
+}
+
+.nav-select {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  height: 34px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.nav-select:focus,
+.nav-select:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
 }
 
 .nav-icon-btn {

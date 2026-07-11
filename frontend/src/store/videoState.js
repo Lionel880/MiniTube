@@ -1,0 +1,26 @@
+import { defineStore } from "pinia";
+
+export const useVideoStateStore = defineStore("videoState", {
+  state: () => ({
+    page: 0,
+    size: Number(localStorage.getItem("minitube_page_size")) || 30, // 預設每頁 30 筆，可選 30, 50, 100
+    searchKeyword: "",
+    currentFolderId: null,
+    currentFolderName: "",
+    sortBy: localStorage.getItem("minitube_sort_by") || "createdAt",
+    sortDir: localStorage.getItem("minitube_sort_dir") || "desc",
+    viewMode: localStorage.getItem("minitube_view_mode") || "grid"
+  }),
+  actions: {
+    resetState() {
+      this.page = 0;
+      this.size = 30;
+      this.searchKeyword = "";
+      this.currentFolderId = null;
+      this.currentFolderName = "";
+      this.sortBy = "createdAt";
+      this.sortDir = "desc";
+      this.viewMode = "grid";
+    }
+  }
+});
