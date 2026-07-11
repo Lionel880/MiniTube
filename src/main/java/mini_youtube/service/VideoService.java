@@ -63,7 +63,8 @@ public class VideoService {
             }
         }
 
-        String storedFilename = fileStorageService.store(file);
+        String folderName = folder != null ? folder.getName() : null;
+        String storedFilename = fileStorageService.store(folderName, file);
 
         String finalTitle = title.trim();
         if (finalTitle.length() > 190) {
@@ -129,7 +130,8 @@ public class VideoService {
                     ? originalFilename.substring(0, originalFilename.lastIndexOf('.'))
                     : (originalFilename != null ? originalFilename : "未命名影片");
 
-            String storedFilename = fileStorageService.store(file);
+            String folderName = folder != null ? folder.getName() : null;
+            String storedFilename = fileStorageService.store(folderName, file);
 
             String finalTitle = title.trim();
             if (finalTitle.length() > 190) {
@@ -208,6 +210,12 @@ public class VideoService {
             throw new BusinessException("您無權編輯其他人上傳的影片");
         }
 
+        if (video.getFilePath() != null && !video.getFilePath().isBlank() 
+                && !video.getTitle().equalsIgnoreCase(request.getTitle().trim())) {
+            String newPath = fileStorageService.renameFile(video.getFilePath(), request.getTitle().trim());
+            video.setFilePath(newPath);
+        }
+
         video.setTitle(request.getTitle().trim());
         video.setDescription(request.getDescription() == null ? "" : request.getDescription().trim());
 
@@ -278,6 +286,7 @@ public class VideoService {
             throw new BusinessException("您無權編輯此影片");
         }
 
+        String targetFolderName = null;
         if (folderId != null) {
             Folder folder = folderRepository.findById(folderId)
                     .orElseThrow(() -> new BusinessException("資料夾不存在"));
@@ -285,8 +294,14 @@ public class VideoService {
                 throw new BusinessException("您無權限將影片放入此資料夾");
             }
             video.setFolder(folder);
+            targetFolderName = folder.getName();
         } else {
             video.setFolder(null);
+        }
+
+        if (video.getFilePath() != null && !video.getFilePath().isBlank()) {
+            String newPath = fileStorageService.moveFile(video.getFilePath(), targetFolderName);
+            video.setFilePath(newPath);
         }
 
         Video saved = videoRepository.save(video);
@@ -298,14 +313,28 @@ public class VideoService {
         if (ids == null || ids.isEmpty()) return;
         User user = getUserOrThrow(username);
         Folder folder = null;
+        String targetFolderName = null;
         if (folderId != null) {
             folder = folderRepository.findById(folderId)
                     .orElseThrow(() -> new BusinessException("資料夾不存在"));
             if (!folder.getOwner().getId().equals(user.getId())) {
                 throw new BusinessException("您無權限將影片放入此資料夾");
             }
+            targetFolderName = folder.getName();
         }
-        videoRepository.batchMoveToFolder(ids, folder, user);
+
+        List<Video> videos = videoRepository.findAllById(ids);
+        for (Video video : videos) {
+            if (!video.getUploader().getId().equals(user.getId())) {
+                throw new BusinessException("您無權編輯此影片");
+            }
+            video.setFolder(folder);
+            if (video.getFilePath() != null && !video.getFilePath().isBlank()) {
+                String newPath = fileStorageService.moveFile(video.getFilePath(), targetFolderName);
+                video.setFilePath(newPath);
+            }
+            videoRepository.save(video);
+        }
     }
 
     private Video getVideoOrThrow(Long id) {

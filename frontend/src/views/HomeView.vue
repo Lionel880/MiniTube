@@ -671,11 +671,11 @@ function formatDate(value) {
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="row-icon video-icon-color">
                 <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
               </svg>
-              <span class="row-name">{{ video.title }}</span>
               <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">
                 <span class="spinner-tiny" style="border-left-color: #d97706;"></span>
                 <span>轉碼中 {{ video.transcodeProgress || 0 }}%</span>
               </span>
+              <span class="row-name">{{ video.title }}</span>
             </div>
             <div class="col-date">{{ formatDate(video.createdAt) }}</div>
             <div class="col-size">{{ formatSize(video.fileSize) }}</div>
@@ -1182,6 +1182,8 @@ function formatDate(value) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .col-date {

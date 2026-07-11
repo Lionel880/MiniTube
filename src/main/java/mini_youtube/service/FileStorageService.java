@@ -41,10 +41,11 @@ public class FileStorageService {
         return this.coversDir;
     }
 
-    /**
-     * 儲存上傳的影片檔案，回傳存放在磁碟上的檔名（不是原始檔名）。
-     */
     public String store(MultipartFile file) {
+        return store(null, file);
+    }
+
+    public String store(String folderName, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("請選擇要上傳的影片檔案");
         }
@@ -52,35 +53,156 @@ public class FileStorageService {
         String originalFilename = StringUtils.cleanPath(
                 file.getOriginalFilename() == null ? "" : file.getOriginalFilename());
 
+        if (originalFilename.isBlank()) {
+            originalFilename = "unnamed_video.mp4";
+        }
+
         String extension = "";
+        String baseName = originalFilename;
         int dotIndex = originalFilename.lastIndexOf('.');
         if (dotIndex >= 0) {
             extension = originalFilename.substring(dotIndex).toLowerCase();
+            baseName = originalFilename.substring(0, dotIndex);
         }
 
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new BusinessException("不支援的影片格式，僅支援：" + String.join(", ", ALLOWED_EXTENSIONS));
         }
 
-        // 額外檢查瀏覽器/用戶端宣告的 MIME type，作為副檔名檢查以外的第二層防護，
-        // 防止有人把非影片檔案改副檔名偽裝成影片上傳。
         String contentType = file.getContentType();
         if (contentType == null || !contentType.toLowerCase().startsWith("video/")) {
             throw new BusinessException("檔案內容類型不是有效的影片格式");
         }
 
-        // 儲存檔名一律使用系統產生的 UUID，不使用使用者原始檔名，避免路徑跳脫或檔名注入問題。
-        String storedFilename = UUID.randomUUID() + extension;
+        Path targetDir = this.uploadDir;
+        if (folderName != null && !folderName.isBlank()) {
+            String cleanFolderName = StringUtils.cleanPath(folderName).replace("/", "").replace("\\", "");
+            targetDir = this.uploadDir.resolve(cleanFolderName);
+        }
 
         try {
-            Path target = this.uploadDir.resolve(storedFilename);
+            Files.createDirectories(targetDir);
+        } catch (IOException e) {
+            throw new BusinessException("無法建立影片儲存目錄", e);
+        }
+
+        String storedFilename = originalFilename;
+        Path target = targetDir.resolve(storedFilename);
+        int count = 1;
+        while (Files.exists(target)) {
+            storedFilename = baseName + "_" + count + extension;
+            target = targetDir.resolve(storedFilename);
+            count++;
+        }
+
+        try {
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            // 不要把底層例外訊息（可能包含伺服器檔案路徑）直接回傳給前端。
             throw new BusinessException("影片儲存失敗，請稍後再試", e);
         }
 
-        return storedFilename;
+        if (folderName != null && !folderName.isBlank()) {
+            String cleanFolderName = StringUtils.cleanPath(folderName).replace("/", "").replace("\\", "");
+            return cleanFolderName + "/" + storedFilename;
+        } else {
+            return storedFilename;
+        }
+    }
+
+    public String renameFile(String oldRelativePath, String newTitle) {
+        try {
+            Path oldPath = this.uploadDir.resolve(oldRelativePath).normalize();
+            if (!oldPath.startsWith(this.uploadDir) || !Files.exists(oldPath)) {
+                return oldRelativePath;
+            }
+
+            String filename = oldPath.getFileName().toString();
+            String extension = "";
+            int dotIndex = filename.lastIndexOf('.');
+            if (dotIndex >= 0) {
+                extension = filename.substring(dotIndex);
+            }
+
+            String cleanTitle = StringUtils.cleanPath(newTitle)
+                    .replace("/", "")
+                    .replace("\\", "")
+                    .replace(":", "")
+                    .replace("*", "")
+                    .replace("?", "")
+                    .replace("\"", "")
+                    .replace("<", "")
+                    .replace(">", "")
+                    .replace("|", "");
+
+            if (cleanTitle.isBlank()) {
+                cleanTitle = "unnamed";
+            }
+
+            Path parentDir = oldPath.getParent();
+            String newFilename = cleanTitle + extension;
+            Path newPath = parentDir.resolve(newFilename);
+
+            int count = 1;
+            while (Files.exists(newPath)) {
+                newFilename = cleanTitle + "_" + count + extension;
+                newPath = parentDir.resolve(newFilename);
+                count++;
+            }
+
+            System.gc();
+
+            Files.move(oldPath, newPath, StandardCopyOption.REPLACE_EXISTING);
+
+            Path relativePath = this.uploadDir.relativize(newPath);
+            return relativePath.toString().replace("\\", "/");
+        } catch (Exception e) {
+            return oldRelativePath;
+        }
+    }
+
+    public String moveFile(String oldRelativePath, String newFolderName) {
+        try {
+            Path oldPath = this.uploadDir.resolve(oldRelativePath).normalize();
+            if (!oldPath.startsWith(this.uploadDir) || !Files.exists(oldPath)) {
+                return oldRelativePath;
+            }
+
+            Path targetDir = this.uploadDir;
+            if (newFolderName != null && !newFolderName.isBlank()) {
+                String cleanFolderName = StringUtils.cleanPath(newFolderName).replace("/", "").replace("\\", "");
+                targetDir = this.uploadDir.resolve(cleanFolderName);
+            }
+
+            Files.createDirectories(targetDir);
+
+            String filename = oldPath.getFileName().toString();
+            String extension = "";
+            String baseName = filename;
+            int dotIndex = filename.lastIndexOf('.');
+            if (dotIndex >= 0) {
+                extension = filename.substring(dotIndex);
+                baseName = filename.substring(0, dotIndex);
+            }
+
+            String newFilename = filename;
+            Path newPath = targetDir.resolve(newFilename);
+
+            int count = 1;
+            while (Files.exists(newPath)) {
+                newFilename = baseName + "_" + count + extension;
+                newPath = targetDir.resolve(newFilename);
+                count++;
+            }
+
+            System.gc();
+
+            Files.move(oldPath, newPath, StandardCopyOption.REPLACE_EXISTING);
+
+            Path relativePath = this.uploadDir.relativize(newPath);
+            return relativePath.toString().replace("\\", "/");
+        } catch (Exception e) {
+            return oldRelativePath;
+        }
     }
 
     /**

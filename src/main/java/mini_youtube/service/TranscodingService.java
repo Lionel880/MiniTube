@@ -85,8 +85,15 @@ public class TranscodingService {
                 return;
             }
 
-            String newStoredFilename = UUID.randomUUID().toString() + ".mp4";
-            Path targetPath = sourcePath.getParent().resolve(newStoredFilename);
+            String originalFilename = sourcePath.getFileName().toString();
+            String baseName = originalFilename;
+            int dotIndex = originalFilename.lastIndexOf('.');
+            if (dotIndex >= 0) {
+                baseName = originalFilename.substring(0, dotIndex);
+            }
+
+            String tempFilename = UUID.randomUUID().toString() + "_temp.mp4";
+            Path targetPath = sourcePath.getParent().resolve(tempFilename);
 
             File source = sourcePath.toFile();
             File target = targetPath.toFile();
@@ -111,53 +118,121 @@ public class TranscodingService {
                     boolean faststartSuccess = runFaststartFix(sourcePath, targetPath);
                     if (faststartSuccess && target.exists() && target.length() > 0) {
                         log.info("無損串流複製成功！新檔案大小: {} bytes", target.length());
-                        String coverFilename = generateCover(targetPath);
-                        if (coverFilename != null) {
-                            video.setCoverUrl(coverFilename);
-                        }
-                        video.setFilePath(newStoredFilename);
-                        video.setFileSize(target.length());
-                        video.setStatus(VideoStatus.READY);
-                        video.setTranscodeProgress(100);
-                        videoRepository.save(video);
                         
                         // 刪除原始上傳的檔案
                         safeDeleteSourceFile(sourcePath, storedFilename);
-                    } else {
-                        log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
-                        String coverFilename = generateCover(sourcePath);
+                        
+                        // 重新命名為最終名稱
+                        Path parentDir = targetPath.getParent();
+                        String finalFilenameOnly = baseName + ".mp4";
+                        Path finalPath = parentDir.resolve(finalFilenameOnly);
+                        int count = 1;
+                        while (Files.exists(finalPath)) {
+                            finalFilenameOnly = baseName + "_" + count + ".mp4";
+                            finalPath = parentDir.resolve(finalFilenameOnly);
+                            count++;
+                        }
+                        System.gc();
+                        Files.move(targetPath, finalPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                        String cleanFinalRelativePath;
+                        if (storedFilename.contains("/")) {
+                            String folderPrefix = storedFilename.substring(0, storedFilename.lastIndexOf("/") + 1);
+                            cleanFinalRelativePath = folderPrefix + finalFilenameOnly;
+                        } else {
+                            cleanFinalRelativePath = finalFilenameOnly;
+                        }
+
+                        String coverFilename = generateCover(finalPath);
                         if (coverFilename != null) {
                             video.setCoverUrl(coverFilename);
                         }
+                        video.setFilePath(cleanFinalRelativePath);
+                        video.setFileSize(finalPath.toFile().length());
                         video.setStatus(VideoStatus.READY);
                         video.setTranscodeProgress(100);
                         videoRepository.save(video);
+                    } else {
+                        log.warn("無損複製失敗或檔案無效，退回至傳統的直接啟用模式");
+                        
+                        Path parentDir = sourcePath.getParent();
+                        String finalFilenameOnly = baseName + ".mp4";
+                        Path finalPath = parentDir.resolve(finalFilenameOnly);
+                        int count = 1;
+                        while (Files.exists(finalPath)) {
+                            finalFilenameOnly = baseName + "_" + count + ".mp4";
+                            finalPath = parentDir.resolve(finalFilenameOnly);
+                            count++;
+                        }
+                        System.gc();
+                        Files.move(sourcePath, finalPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                        String cleanFinalRelativePath;
+                        if (storedFilename.contains("/")) {
+                            String folderPrefix = storedFilename.substring(0, storedFilename.lastIndexOf("/") + 1);
+                            cleanFinalRelativePath = folderPrefix + finalFilenameOnly;
+                        } else {
+                            cleanFinalRelativePath = finalFilenameOnly;
+                        }
+
+                        String coverFilename = generateCover(finalPath);
+                        if (coverFilename != null) {
+                            video.setCoverUrl(coverFilename);
+                        }
+                        video.setFilePath(cleanFinalRelativePath);
+                        video.setFileSize(finalPath.toFile().length());
+                        video.setStatus(VideoStatus.READY);
+                        video.setTranscodeProgress(100);
+                        videoRepository.save(video);
+
+                        if (target.exists()) {
+                            target.delete();
+                        }
                     }
                     return;
                 }
 
-                log.info("正在執行 FFmpeg 轉碼 (目標檔名: {})...", newStoredFilename);
+                log.info("正在執行 FFmpeg 轉碼 (目標臨時檔名: {})...", tempFilename);
                 boolean transcodeSuccess = runTranscodeCommand(sourcePath, targetPath, videoId, durationMs);
                 if (!transcodeSuccess) {
                     throw new RuntimeException("FFmpeg 轉碼命令行執行失敗");
                 }
-                log.info("轉碼成功！新檔案大小: {} bytes", target.length());
+                log.info("轉碼成功！臨時檔案大小: {} bytes", target.length());
+
+                // 1. 刪除原始上傳的檔案 (sourcePath)
+                safeDeleteSourceFile(sourcePath, storedFilename);
+
+                // 2. 重新命名為最終名稱
+                Path parentDir = targetPath.getParent();
+                String finalFilenameOnly = baseName + ".mp4";
+                Path finalPath = parentDir.resolve(finalFilenameOnly);
+                int count = 1;
+                while (Files.exists(finalPath)) {
+                    finalFilenameOnly = baseName + "_" + count + ".mp4";
+                    finalPath = parentDir.resolve(finalFilenameOnly);
+                    count++;
+                }
+                System.gc();
+                Files.move(targetPath, finalPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                String cleanFinalRelativePath;
+                if (storedFilename.contains("/")) {
+                    String folderPrefix = storedFilename.substring(0, storedFilename.lastIndexOf("/") + 1);
+                    cleanFinalRelativePath = folderPrefix + finalFilenameOnly;
+                } else {
+                    cleanFinalRelativePath = finalFilenameOnly;
+                }
 
                 // 轉碼成功，更新資料庫資訊
-                String coverFilename = generateCover(targetPath);
+                String coverFilename = generateCover(finalPath);
                 if (coverFilename != null) {
                     video.setCoverUrl(coverFilename);
                 }
-                video.setFilePath(newStoredFilename);
-                video.setFileSize(target.length());
+                video.setFilePath(cleanFinalRelativePath);
+                video.setFileSize(finalPath.toFile().length());
                 video.setStatus(VideoStatus.READY);
                 video.setTranscodeProgress(100);
                 videoRepository.save(video);
-
-                // 刪除原始上傳的檔案 (如果是不同檔案才刪除)
-                if (!storedFilename.equals(newStoredFilename)) {
-                    safeDeleteSourceFile(sourcePath, storedFilename);
-                }
 
             } catch (Exception e) {
                 log.error("轉碼失敗，影片 ID: {}", videoId, e);
