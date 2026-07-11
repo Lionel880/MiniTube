@@ -218,8 +218,15 @@ onMounted(() => load());
 
     <div v-else-if="video" class="video-detail-layout glass-card">
       <div class="video-player-container">
-        <div v-if="video.status === 'UPLOADING'" class="transcoding-placeholder">
-          <div class="spinner"></div>
+        <div v-if="video.status === 'UPLOADING'" class="transcoding-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;">
+          <svg class="progress-ring-large" width="40" height="40" style="transform: rotate(-90deg);">
+            <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.15)" stroke-width="3" fill="transparent" r="16" cx="20" cy="20"/>
+            <circle class="progress-ring-circle" stroke="var(--accent-blue)" stroke-width="3" fill="transparent" r="16" cx="20" cy="20"
+                    :stroke-dasharray="2 * Math.PI * 16"
+                    :stroke-dashoffset="2 * Math.PI * 16 * (1 - (video.transcodeProgress || 0) / 100)"
+                    stroke-linecap="round"
+                    style="transition: stroke-dashoffset 0.35s;"/>
+          </svg>
           <p>影片正在背景轉碼中，目前進度：{{ video.transcodeProgress || 0 }}%</p>
           <button class="btn primary refresh-status-btn" type="button" @click="load()">🔄 重整狀態</button>
         </div>

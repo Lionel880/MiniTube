@@ -38,6 +38,10 @@ public class Folder {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id", nullable = true)
+    private Folder parent;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

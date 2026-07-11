@@ -27,6 +27,8 @@ const {
 } = storeToRefs(videoStateStore);
 const videos = ref([]);
 const folders = ref([]);
+const currentFolderBreadcrumbs = ref([]);
+const currentParentFolderId = ref(null);
 
 // 獨立的資料夾排序狀態
 const folderSortBy = ref(localStorage.getItem("minitube_folder_sort_by") || "createdAt");
@@ -69,7 +71,9 @@ function toggleSelectMode() {
 async function loadFolders() {
   if (!authStore.isLoggedIn) return;
   try {
-    const res = await http.get("/folders");
+    const res = await http.get("/folders", {
+      params: { parentId: currentFolderId.value }
+    });
     folders.value = res.data;
   } catch (err) {
     console.error("無法取得資料夾列表", err);
@@ -80,7 +84,10 @@ async function createFolder() {
   const name = prompt("請輸入新資料夾名稱：");
   if (!name || !name.trim()) return;
   try {
-    await http.post("/folders", { name: name.trim() });
+    await http.post("/folders", {
+      name: name.trim(),
+      parentId: currentFolderId.value
+    });
     await loadFolders();
   } catch (err) {
     alert("建立資料夾失敗：" + (err.response?.data?.message || err.message));
@@ -99,33 +106,78 @@ async function editFolder(folder) {
 }
 
 async function deleteFolder(folder) {
-  if (!confirm(`確定要刪除資料夾「${folder.name}」嗎？\n資料夾內的影片會被安全移回「全部影片（根目錄）」，不會被刪除。`)) return;
+  if (!confirm(`確定要刪除資料夾「${folder.name}」嗎？\n資料夾內的子資料夾及影片會被安全移出，影片保留在根目錄，不會被刪除。`)) return;
   try {
     await http.delete(`/folders/${folder.id}`);
     await loadFolders();
-    if (currentFolderId.value === null) {
-      load(0);
-    }
+    load(0);
   } catch (err) {
     alert("刪除資料夾失敗：" + (err.response?.data?.message || err.message));
   }
 }
 
-function enterFolder(folder) {
-  currentFolderId.value = folder.id;
-  currentFolderName.value = folder.name;
-  sessionStorage.setItem("minitube_active_folder_id", folder.id);
-  sessionStorage.setItem("minitube_active_folder_name", folder.name);
+async function navigateToFolder(folderId) {
+  if (folderId === null || folderId === "null" || folderId === "") {
+    currentFolderId.value = null;
+    currentFolderName.value = "";
+    currentFolderBreadcrumbs.value = [];
+    currentParentFolderId.value = null;
+    sessionStorage.removeItem("minitube_active_folder_id");
+    sessionStorage.removeItem("minitube_active_folder_name");
+  } else {
+    currentFolderId.value = Number(folderId);
+    sessionStorage.setItem("minitube_active_folder_id", folderId);
+    try {
+      const res = await http.get(`/folders/${folderId}`);
+      currentFolderName.value = res.data.name;
+      currentFolderBreadcrumbs.value = res.data.breadcrumbs || [];
+      currentParentFolderId.value = res.data.parentId;
+      sessionStorage.setItem("minitube_active_folder_name", res.data.name);
+    } catch (err) {
+      console.error("無法取得資料夾詳情", err);
+      currentFolderId.value = null;
+      currentFolderName.value = "";
+      currentFolderBreadcrumbs.value = [];
+      currentParentFolderId.value = null;
+      sessionStorage.removeItem("minitube_active_folder_id");
+      sessionStorage.removeItem("minitube_active_folder_name");
+    }
+  }
+  await loadFolders();
   load(0);
 }
 
+const allFolders = ref([]);
+
+async function loadAllFolders() {
+  try {
+    const res = await http.get("/folders", { params: { all: true } });
+    allFolders.value = res.data;
+  } catch (err) {
+    console.error("無法取得所有資料夾列表", err);
+  }
+}
+
+function toggleBatchFolderDropdown() {
+  showBatchFolderDropdown.value = !showBatchFolderDropdown.value;
+  if (showBatchFolderDropdown.value) {
+    loadAllFolders();
+  }
+}
+
+function getFolderFullPath(folder) {
+  if (!folder.breadcrumbs || folder.breadcrumbs.length === 0) {
+    return folder.name;
+  }
+  return folder.breadcrumbs.map(c => c.name).join(" › ");
+}
+
+function enterFolder(folder) {
+  navigateToFolder(folder.id);
+}
+
 function exitFolder() {
-  currentFolderId.value = null;
-  currentFolderName.value = "";
-  sessionStorage.removeItem("minitube_active_folder_id");
-  sessionStorage.removeItem("minitube_active_folder_name");
-  loadFolders();
-  load(0);
+  navigateToFolder(currentParentFolderId.value);
 }
 
 async function batchMoveToFolder(folderId) {
@@ -394,25 +446,11 @@ watch(
   }
 );
 
-function restoreFolderState() {
-  const storedFolderId = sessionStorage.getItem("minitube_active_folder_id");
-  const storedFolderName = sessionStorage.getItem("minitube_active_folder_name");
-  if (storedFolderId !== null && storedFolderId !== "null") {
-    currentFolderId.value = Number(storedFolderId);
-    currentFolderName.value = storedFolderName || "";
-  } else {
-    currentFolderId.value = null;
-    currentFolderName.value = "";
-  }
-}
-
 watch(
   () => authStore.isLoggedIn,
   (loggedIn) => {
     if (loggedIn) {
-      restoreFolderState();
-      loadFolders();
-      load(page.value);
+      navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"));
     } else {
       videos.value = [];
       folders.value = [];
@@ -427,9 +465,7 @@ watch(
 onMounted(() => {
   window.addEventListener("click", handleOutsideClick);
   if (authStore.isLoggedIn) {
-    restoreFolderState();
-    loadFolders();
-    load(page.value);
+    navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"));
   }
 });
 
@@ -506,10 +542,20 @@ function formatDate(value) {
             <span
               v-if="currentFolderId !== null"
               class="crumb-link"
-              @click="exitFolder"
+              @click="navigateToFolder(null)"
             >全部影片</span>
-            <span v-if="currentFolderId !== null" class="crumb-sep">›</span>
-            <span class="crumb-current">{{ currentFolderId !== null ? currentFolderName : '全部影片' }}</span>
+            
+            <template v-for="crumb in currentFolderBreadcrumbs" :key="crumb.id">
+              <span class="crumb-sep">›</span>
+              <span
+                v-if="crumb.id !== currentFolderId"
+                class="crumb-link"
+                @click="navigateToFolder(crumb.id)"
+              >{{ crumb.name }}</span>
+              <span v-else class="crumb-current">{{ crumb.name }}</span>
+            </template>
+            
+            <span v-if="currentFolderId === null" class="crumb-current">全部影片</span>
           </div>
         </div>
 
@@ -566,18 +612,19 @@ function formatDate(value) {
           刪除 ({{ totalSelected }})
         </button>
         <div class="batch-folder-container" v-if="selectedIds.length > 0">
-          <button class="action-btn" @click="showBatchFolderDropdown = !showBatchFolderDropdown">
+          <button class="action-btn" @click="toggleBatchFolderDropdown">
             移入文件夾
           </button>
           <div v-if="showBatchFolderDropdown" class="batch-folder-dropdown">
             <div class="dropdown-header">移動至：</div>
             <div class="dropdown-item" @click="batchMoveToFolder(null)">根目錄</div>
             <div
-              v-for="folder in folders"
+              v-for="folder in allFolders"
               :key="folder.id"
               class="dropdown-item"
               @click="batchMoveToFolder(folder.id)"
-            >{{ folder.name }}</div>
+              :title="getFolderFullPath(folder)"
+            >{{ getFolderFullPath(folder) }}</div>
           </div>
         </div>
       </div>
@@ -612,8 +659,8 @@ function formatDate(value) {
           <div class="col-actions-header"></div>
         </div>
 
-        <!-- 資料夾行（根目錄才顯示，且搜尋時隱藏） -->
-        <template v-if="currentFolderId === null && !searchKeyword.trim()">
+        <!-- 資料夾行（且搜尋時隱藏） -->
+        <template v-if="!searchKeyword.trim()">
           <div
             v-for="folder in sortedFolders"
             :key="'folder-' + folder.id"
@@ -671,9 +718,16 @@ function formatDate(value) {
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" class="row-icon video-icon-color">
                 <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
               </svg>
-              <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">
-                <span class="spinner-tiny" style="border-left-color: #d97706;"></span>
-                <span>轉碼中 {{ video.transcodeProgress || 0 }}%</span>
+              <span v-if="video.status === 'UPLOADING'" class="status-badge uploading" style="display: inline-flex; align-items: center; gap: 6px;">
+                <svg class="progress-ring-tiny" width="14" height="14" style="transform: rotate(-90deg);">
+                  <circle class="progress-ring-bg" stroke="rgba(217, 119, 6, 0.15)" stroke-width="1.8" fill="transparent" r="5" cx="7" cy="7"/>
+                  <circle class="progress-ring-circle" stroke="#d97706" stroke-width="1.8" fill="transparent" r="5" cx="7" cy="7"
+                          :stroke-dasharray="2 * Math.PI * 5"
+                          :stroke-dashoffset="2 * Math.PI * 5 * (1 - (video.transcodeProgress || 0) / 100)"
+                          stroke-linecap="round"
+                          style="transition: stroke-dashoffset 0.35s;"/>
+                </svg>
+                <span>轉檔 {{ video.transcodeProgress || 0 }}%</span>
               </span>
               <span class="row-name">{{ video.title }}</span>
             </div>
@@ -697,8 +751,8 @@ function formatDate(value) {
 
       <!-- ===== 格狀視圖 ===== -->
       <template v-else>
-        <!-- 資料夾格狀（根目錄才顯示，且搜尋時隱藏） -->
-        <template v-if="currentFolderId === null && !searchKeyword.trim() && sortedFolders.length > 0">
+        <!-- 資料夾格狀（且搜尋時隱藏） -->
+        <template v-if="!searchKeyword.trim() && sortedFolders.length > 0">
           <div class="section-label">文件夾</div>
           <div class="folders-grid">
             <div

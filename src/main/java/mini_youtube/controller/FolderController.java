@@ -27,8 +27,22 @@ public class FolderController {
     private final FolderService folderService;
 
     @GetMapping
-    public List<FolderResponse> getFolders(Authentication authentication) {
-        return folderService.getFoldersByOwner(authentication.getName());
+    public List<FolderResponse> getFolders(
+            Authentication authentication,
+            @org.springframework.web.bind.annotation.RequestParam(value = "parentId", required = false) Long parentId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "all", required = false, defaultValue = "false") boolean all) {
+        if (all) {
+            return folderService.getAllFoldersByOwner(authentication.getName());
+        }
+        return folderService.getFoldersByOwner(authentication.getName(), parentId);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<FolderResponse> getFolderById(
+            Authentication authentication,
+            @PathVariable("id") Long id) {
+        FolderResponse response = folderService.getFolderById(authentication.getName(), id);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping

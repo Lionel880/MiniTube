@@ -118,8 +118,16 @@ function formatSize(bytes) {
     <div class="thumb-container">
       <img v-if="coverBlobUrl" :src="coverBlobUrl" class="thumb-img" alt="cover" />
       <div v-else class="thumb"></div>
-      <div v-if="video.status === 'UPLOADING'" class="status-overlay processing">
-        <div class="spinner-small"></div> 轉碼中 {{ video.transcodeProgress || 0 }}%
+      <div v-if="video.status === 'UPLOADING'" class="status-overlay processing" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+        <svg class="progress-ring-small" width="24" height="24" style="transform: rotate(-90deg);">
+          <circle class="progress-ring-bg" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2.2" fill="transparent" r="9" cx="12" cy="12"/>
+          <circle class="progress-ring-circle" stroke="#3ea6ff" stroke-width="2.2" fill="transparent" r="9" cx="12" cy="12"
+                  :stroke-dasharray="2 * Math.PI * 9"
+                  :stroke-dashoffset="2 * Math.PI * 9 * (1 - (video.transcodeProgress || 0) / 100)"
+                  stroke-linecap="round"
+                  style="transition: stroke-dashoffset 0.35s;"/>
+        </svg>
+        <span style="font-size: 12px; font-weight: 500;">轉碼中 {{ video.transcodeProgress || 0 }}%</span>
       </div>
       <div v-else-if="video.status === 'FAILED'" class="status-overlay failed">
         轉碼失敗

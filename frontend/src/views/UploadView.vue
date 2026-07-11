@@ -7,15 +7,18 @@ const router = useRouter();
 const uploadStore = useUploadStore();
 
 onMounted(() => {
-  uploadStore.queue = [];
-  uploadStore.errorMessage = "";
-  uploadStore.progress = 0;
+  if (!uploadStore.isUploading) {
+    uploadStore.queue = [];
+    uploadStore.errorMessage = "";
+    uploadStore.progress = 0;
+  }
 });
 
 const title = ref("");
 const files = ref([]);
 const errorMessage = ref("");
 const fileInput = ref(null);
+const folderInput = ref(null);
 const isDragOver = ref(false);
 
 const ALLOWED_EXTENSIONS = [
@@ -28,6 +31,17 @@ function triggerFileInput() {
   fileInput.value.click();
 }
 
+function triggerFolderInput() {
+  if (uploadStore.isUploading) return;
+  folderInput.value.click();
+}
+
+function onFolderChange(event) {
+  const selectedList = Array.from(event.target.files);
+  processSelectedFiles(selectedList);
+  event.target.value = "";
+}
+
 function onDragOver() {
   if (uploadStore.isUploading) return;
   isDragOver.value = true;
@@ -37,11 +51,66 @@ function onDragLeave() {
   isDragOver.value = false;
 }
 
-function onDrop(event) {
+async function onDrop(event) {
   if (uploadStore.isUploading) return;
   isDragOver.value = false;
-  const droppedFiles = Array.from(event.dataTransfer.files);
-  processSelectedFiles(droppedFiles);
+  
+  const items = event.dataTransfer.items;
+  if (!items) return;
+  
+  const filesList = [];
+  const promises = [];
+  
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.kind === "file") {
+      const entry = item.webkitGetAsEntry();
+      if (entry) {
+        promises.push(traverseFileTree(entry, filesList));
+      }
+    }
+  }
+  
+  await Promise.all(promises);
+  processSelectedFiles(filesList);
+}
+
+async function traverseFileTree(entry, filesList) {
+  if (entry.isFile) {
+    const file = await getFileFromEntry(entry);
+    filesList.push(file);
+  } else if (entry.isDirectory) {
+    const dirReader = entry.createReader();
+    const entries = await readAllEntries(dirReader);
+    const promises = [];
+    for (const subEntry of entries) {
+      promises.push(traverseFileTree(subEntry, filesList));
+    }
+    await Promise.all(promises);
+  }
+}
+
+function getFileFromEntry(entry) {
+  return new Promise((resolve, reject) => {
+    entry.file(resolve, reject);
+  });
+}
+
+function readAllEntries(dirReader) {
+  return new Promise((resolve) => {
+    const allEntries = [];
+    function read() {
+      dirReader.readEntries((entries) => {
+        if (entries.length > 0) {
+          allEntries.push(...entries);
+          read();
+        } else {
+          resolve(allEntries);
+        }
+      }, () => resolve(allEntries));
+    }
+    read();
+  });
 }
 
 function onFileChange(event) {
@@ -58,27 +127,23 @@ function processSelectedFiles(selectedList) {
     return;
   }
 
-  const invalid = selectedList.find((file) => {
+  const validFiles = selectedList.filter((file) => {
     const name = file.name.toLowerCase();
     const isImageExtension = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp"].some((ext) => name.endsWith(ext));
     const isImageMime = file.type && file.type.startsWith("image/");
-    return isImageExtension || isImageMime || !ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
+    const hasVideoExtension = ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext));
+    const isVideoMime = file.type && file.type.startsWith("video/");
+    
+    return !isImageExtension && !isImageMime && (hasVideoExtension || isVideoMime);
   });
 
-  if (invalid) {
-    const name = invalid.name.toLowerCase();
-    const isImage = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".bmp"].some((ext) => name.endsWith(ext)) || (invalid.type && invalid.type.startsWith("image/"));
-    if (isImage) {
-      errorMessage.value = `檔案「${invalid.name}」為圖片格式。本平台僅供上傳影片檔案，請重新選擇！`;
-    } else {
-      errorMessage.value = `檔案「${invalid.name}」格式不支援，僅支援：${ALLOWED_EXTENSIONS.join(", ")}`;
-    }
+  if (validFiles.length === 0) {
+    errorMessage.value = "在所選內容中找不到任何支援的影片檔案，請重新選擇！";
     return;
   }
 
-  files.value = selectedList;
+  files.value = validFiles;
   if (files.value.length === 1) {
-    // 只有一個檔案時，預填標題為檔案主檔名
     const name = files.value[0].name;
     const dotIndex = name.lastIndexOf('.');
     title.value = dotIndex >= 0 ? name.substring(0, dotIndex) : name;
@@ -159,6 +224,29 @@ async function onSubmit() {
             <p v-else class="selected-text">已選擇 {{ files.length }} 個影片檔案</p>
             <span class="file-hint">支援 MP4, WebM, MKV, AVI, MOV 等影片格式</span>
           </div>
+        </div>
+
+        <div v-if="uploadStore.queue.length === 0" class="folder-upload-actions" style="margin-bottom: 24px; text-align: center;">
+          <input
+            id="folderInput"
+            ref="folderInput"
+            type="file"
+            webkitdirectory
+            directory
+            multiple
+            style="display: none;"
+            @change="onFolderChange"
+            :disabled="uploadStore.isUploading"
+          />
+          <button
+            class="btn secondary"
+            type="button"
+            style="max-width: 250px; margin: 0 auto;"
+            :disabled="uploadStore.isUploading"
+            @click="triggerFolderInput"
+          >
+            📂 選擇整個資料夾上傳
+          </button>
         </div>
 
         <!-- 只有在單檔上傳時顯示標題輸入欄位 -->

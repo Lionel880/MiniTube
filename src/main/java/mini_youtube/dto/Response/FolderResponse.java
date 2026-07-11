@@ -17,4 +17,6 @@ public class FolderResponse {
     private Long id;
     private String name;
     private LocalDateTime createdAt;
+    private Long parentId;
+    private java.util.List<FolderResponse> breadcrumbs;
 }

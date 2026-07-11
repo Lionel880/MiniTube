@@ -116,16 +116,16 @@ function clearApiUrl() {
       </div>
     </div>
 
-    <!-- 搜尋框 (登入後且非首頁與影片詳細頁時顯示) -->
-    <form v-if="authStore.isLoggedIn && route.name !== 'home' && route.name !== 'video-detail'" @submit.prevent="onSearch">
+    <!-- 搜尋框 (登入後且非首頁、影片詳細頁與上傳頁時顯示) -->
+    <form v-if="authStore.isLoggedIn && route.name !== 'home' && route.name !== 'video-detail' && route.name !== 'upload'" @submit.prevent="onSearch">
       <input v-model="keyword" type="text" placeholder="搜尋影片" />
       <button class="search-btn" type="submit">搜尋</button>
     </form>
 
     <div class="nav-actions">
       <template v-if="authStore.isLoggedIn">
-        <!-- 上傳按鈕 (首頁時隱藏，避免重複) -->
-        <RouterLink v-if="route.name !== 'home'" class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
+        <!-- 上傳按鈕 (首頁與上傳頁時隱藏，避免重複) -->
+        <RouterLink v-if="route.name !== 'home' && route.name !== 'upload'" class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
         <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
         <button class="btn danger" type="button" @click="onLogout">登出</button>
       </template>
@@ -300,7 +300,7 @@ function clearApiUrl() {
 }
 
 .navbar-upload-indicator {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 8px;
   background: rgba(255, 122, 0, 0.1);

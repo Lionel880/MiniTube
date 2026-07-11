@@ -264,6 +264,7 @@ public class TranscodingService {
                 "-movflags", "faststart",
                 "-c:a", "aac",
                 "-b:a", "128k",
+                "-progress", "-",
                 targetPath.toAbsolutePath().toString()
             );
             
@@ -276,22 +277,20 @@ public class TranscodingService {
                     new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    int timeIdx = line.indexOf("time=");
-                    if (timeIdx != -1) {
-                        String timeStr = line.substring(timeIdx + 5).trim();
-                        int spaceIdx = timeStr.indexOf(" ");
-                        if (spaceIdx != -1) {
-                            timeStr = timeStr.substring(0, spaceIdx);
-                        }
-                        
-                        long currentMs = parseTimeStrToMs(timeStr);
-                        if (durationMs > 0 && currentMs > 0) {
-                            int progress = (int) ((currentMs * 100) / durationMs);
-                            progress = Math.min(progress, 99);
-                            if (progress > lastProgress) {
-                                lastProgress = progress;
-                                updateTranscodeProgress(videoId, progress);
+                    if (line.startsWith("out_time_us=")) {
+                        try {
+                            long currentUs = Long.parseLong(line.substring(12).trim());
+                            long currentMs = currentUs / 1000;
+                            if (durationMs > 0 && currentMs > 0) {
+                                int progress = (int) ((currentMs * 100) / durationMs);
+                                progress = Math.min(progress, 99);
+                                if (progress > lastProgress) {
+                                    lastProgress = progress;
+                                    updateTranscodeProgress(videoId, progress);
+                                }
                             }
+                        } catch (Exception e) {
+                            // 忽略
                         }
                     }
                 }
