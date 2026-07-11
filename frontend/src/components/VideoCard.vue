@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import http from "../api/http";
+import { updateVideo } from "../api/video";
 
 const props = defineProps({
   video: { type: Object, required: true },
@@ -76,6 +77,22 @@ function goToDetail() {
   }
 }
 
+async function renameVideo() {
+  const newTitle = prompt("請輸入新的影片檔名：", props.video.title);
+  if (newTitle === null) return;
+  const trimmed = newTitle.trim();
+  if (!trimmed) {
+    alert("影片檔名不能為空");
+    return;
+  }
+  try {
+    await updateVideo(props.video.id, { title: trimmed });
+    emit("refresh");
+  } catch (err) {
+    alert("修改檔名失敗：" + (err.response?.data?.message || err.message));
+  }
+}
+
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("zh-TW", {
@@ -118,7 +135,14 @@ function formatSize(bytes) {
     </div>
     <div class="info">
       <div class="title-row" @click.stop>
-        <div class="title" :title="video.title" @click="goToDetail">{{ video.title }}</div>
+        <div class="video-card-title-group">
+          <div class="title" :title="video.title" @click="goToDetail">{{ video.title }}</div>
+          <button class="video-edit-inline-btn" @click.stop="renameVideo" title="修改檔名">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+          </button>
+        </div>
         <div v-if="folders && folders.length" class="folder-move-container">
           <button class="folder-move-btn" @click="showDropdown = !showDropdown" title="移動到資料夾">
             分類
@@ -261,5 +285,43 @@ function formatSize(bytes) {
 .dropdown-item.active {
   color: var(--accent-blue);
   font-weight: 600;
+}
+
+.video-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.video-card-title-group .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-edit-inline-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  opacity: 0;
+}
+
+.video-card:hover .video-edit-inline-btn {
+  opacity: 0.5;
+}
+
+.video-edit-inline-btn:hover {
+  opacity: 1 !important;
+  color: var(--accent-blue) !important;
+  background: rgba(255, 122, 0, 0.1) !important;
 }
 </style>

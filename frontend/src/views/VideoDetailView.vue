@@ -260,10 +260,6 @@ onMounted(() => load());
             </div>
           </div>
 
-          <div class="video-description-box">
-            <h3>影片描述</h3>
-            <p class="video-description">{{ video.description || "（沒有描述）" }}</p>
-          </div>
         </template>
 
         <!-- 編輯模式 -->
@@ -273,10 +269,6 @@ onMounted(() => load());
           <div class="field">
             <label for="edit-title">標題（必填，最多 200 字）</label>
             <input id="edit-title" v-model="editTitle" type="text" maxlength="200" :disabled="saving" />
-          </div>
-          <div class="field">
-            <label for="edit-description">描述（選填，最多 2000 字）</label>
-            <textarea id="edit-description" v-model="editDescription" maxlength="2000" rows="5" :disabled="saving"></textarea>
           </div>
 
           <div class="edit-actions">

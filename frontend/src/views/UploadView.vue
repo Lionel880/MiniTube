@@ -1,13 +1,18 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useUploadStore } from "../store/upload";
 
 const router = useRouter();
 const uploadStore = useUploadStore();
 
+onMounted(() => {
+  uploadStore.queue = [];
+  uploadStore.errorMessage = "";
+  uploadStore.progress = 0;
+});
+
 const title = ref("");
-const description = ref("");
 const files = ref([]);
 const errorMessage = ref("");
 const fileInput = ref(null);
@@ -97,20 +102,14 @@ async function onSubmit() {
   const folderId = activeFolderId && activeFolderId !== "null" ? Number(activeFolderId) : null;
 
   if (files.value.length === 1) {
-    // 單檔背景上傳
     uploadStore.startUploadSingle({
       title: title.value,
-      description: description.value,
       folderId: folderId,
       file: files.value[0]
     });
   } else {
-    // 多檔背景批量上傳
     uploadStore.startUploadBatch(files.value, folderId);
   }
-
-  // 按下上傳後立刻秒回首頁，讓它在背景慢慢傳
-  router.push({ name: "home" });
 }
 </script>
 
@@ -162,38 +161,77 @@ async function onSubmit() {
           </div>
         </div>
 
-        <!-- 只有在單檔上傳時顯示標題與描述輸入欄位 -->
-        <template v-if="files.length === 1">
+        <!-- 只有在單檔上傳時顯示標題輸入欄位 -->
+        <template v-if="files.length === 1 && uploadStore.queue.length === 0">
           <div class="field">
             <label for="title">標題（必填，最多 200 字）</label>
             <input id="title" v-model="title" type="text" maxlength="200" :disabled="uploadStore.isUploading" required />
           </div>
-          <div class="field">
-            <label for="description">描述（選填，最多 2000 字）</label>
-            <textarea id="description" v-model="description" maxlength="2000" :disabled="uploadStore.isUploading"></textarea>
-          </div>
         </template>
 
-        <!-- 批量上傳提示 -->
-        <div v-else-if="files.length > 1" class="batch-upload-notice">
+        <!-- 批量上傳提示 (尚未上傳時顯示) -->
+        <div v-else-if="files.length > 1 && uploadStore.queue.length === 0" class="batch-upload-notice">
           已選擇 <strong>{{ files.length }}</strong> 個影片，系統將會自動以檔名做為標題進行批量上傳。
           <ul class="file-list">
             <li v-for="(file, idx) in files" :key="idx">{{ file.name }}</li>
           </ul>
         </div>
 
-        <div v-if="uploadStore.isUploading" class="progress-container">
+        <!-- 全局進度與狀態摘要 -->
+        <div v-if="uploadStore.queue.length > 0" class="upload-summary-panel">
+          <div class="overall-progress-row">
+            <span class="overall-label">總上傳進度：</span>
+            <span class="overall-percentage">{{ uploadStore.progress }}%</span>
+          </div>
           <div class="progress-bar">
             <div class="fill" :style="{ width: uploadStore.progress + '%' }"></div>
           </div>
-          <span class="progress-text">上傳中... {{ uploadStore.progress }}%</span>
+          <div v-if="!uploadStore.isUploading" class="summary-status-alert">
+            <div v-if="uploadStore.errorMessage" class="alert-box error-alert">
+              ⚠️ 部分影片上傳失敗，詳細錯誤請見下方列表。
+            </div>
+            <div v-else class="alert-box success-alert">
+              🎉 所有影片均已成功上傳！
+            </div>
+          </div>
+        </div>
+
+        <!-- 逐個影片佇列與個別進度 -->
+        <div v-if="uploadStore.queue.length > 0" class="upload-queue-container">
+          <h3>上傳清單 (共 {{ uploadStore.filesCount }} 部)</h3>
+          <div class="queue-list">
+            <div v-for="(item, idx) in uploadStore.queue" :key="idx" class="queue-item">
+              <div class="queue-item-header">
+                <span class="queue-item-name" :title="item.fileName">{{ item.fileName }}</span>
+                <span class="queue-item-status" :class="item.status">
+                  <template v-if="item.status === 'waiting'">等待中</template>
+                  <template v-else-if="item.status === 'uploading'">上傳中 {{ item.progress }}%</template>
+                  <template v-else-if="item.status === 'success'">✓ 成功</template>
+                  <template v-else-if="item.status === 'error'">✗ 失敗</template>
+                </span>
+              </div>
+              <div class="queue-item-bar-container">
+                <div class="queue-item-bar">
+                  <div class="fill" :class="item.status" :style="{ width: item.progress + '%' }"></div>
+                </div>
+              </div>
+              <p v-if="item.status === 'error' && item.errorMessage" class="queue-item-error">
+                {{ item.errorMessage }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div class="form-actions">
-          <button class="btn" type="button" :disabled="uploadStore.isUploading" @click="onCancel">取消</button>
-          <button class="btn primary" type="submit" :disabled="uploadStore.isUploading || files.length === 0">
-            {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : "開始上傳" }}
-          </button>
+          <template v-if="uploadStore.queue.length > 0 && !uploadStore.isUploading">
+            <button class="btn primary" type="button" @click="router.push({ name: 'home' })">完成並返回首頁</button>
+          </template>
+          <template v-else>
+            <button class="btn" type="button" :disabled="uploadStore.isUploading" @click="onCancel">取消</button>
+            <button class="btn primary" type="submit" :disabled="uploadStore.isUploading || files.length === 0">
+              {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : "開始上傳" }}
+            </button>
+          </template>
         </div>
       </form>
     </div>
@@ -271,9 +309,169 @@ async function onSubmit() {
 .form-actions {
   display: flex;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 24px;
 }
 .form-actions .btn {
   flex: 1;
+}
+
+/* 批次上傳提示 */
+.batch-upload-notice {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 16px;
+  border-radius: var(--border-radius-md);
+  margin-bottom: 24px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.file-list {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  max-height: 150px;
+  overflow-y: auto;
+  color: var(--text-secondary);
+}
+
+/* 全局進度與狀態摘要 */
+.upload-summary-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.overall-progress-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.overall-percentage {
+  color: var(--accent-blue);
+}
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-bar .fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.summary-status-alert {
+  margin-top: 16px;
+}
+.alert-box {
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+.alert-box.success-alert {
+  background: rgba(46, 125, 50, 0.15);
+  border: 1px solid #2e7d32;
+  color: #81c784;
+}
+.alert-box.error-alert {
+  background: rgba(198, 40, 40, 0.15);
+  border: 1px solid #c62828;
+  color: #e57373;
+}
+
+/* 逐個影片佇列與個別進度 */
+.upload-queue-container {
+  margin-bottom: 24px;
+}
+.upload-queue-container h3 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.15);
+}
+.queue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.queue-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.queue-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  gap: 12px;
+}
+.queue-item-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.queue-item-status {
+  font-weight: 600;
+  font-size: 11px;
+}
+.queue-item-status.waiting {
+  color: var(--text-muted);
+}
+.queue-item-status.uploading {
+  color: var(--accent-blue);
+}
+.queue-item-status.success {
+  color: #81c784;
+}
+.queue-item-status.error {
+  color: #e57373;
+}
+.queue-item-bar-container {
+  width: 100%;
+}
+.queue-item-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.queue-item-bar .fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.queue-item-bar .fill.success {
+  background: #2e7d32;
+}
+.queue-item-bar .fill.error {
+  background: #c62828;
+}
+.queue-item-error {
+  font-size: 11px;
+  color: #e57373;
+  margin: 2px 0 0 0;
+  word-break: break-all;
 }
 </style>

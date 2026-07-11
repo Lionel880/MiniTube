@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useVideoStateStore } from "../store/videoState";
-import { listVideos, searchVideos, batchDeleteVideos, deleteAllVideos } from "../api/video";
+import { listVideos, searchVideos, batchDeleteVideos, deleteAllVideos, updateVideo } from "../api/video";
 import { useAuthStore } from "../store/auth";
 import VideoCard from "../components/VideoCard.vue";
 import { useUploadStore } from "../store/upload";
@@ -218,6 +218,7 @@ async function load(p = 0, silent = false) {
     }
     
     videos.value = data.videos || [];
+    videoStateStore.videos = videos.value;
     page.value = data.page || 0;
     totalPages.value = data.totalPages || 0;
     if (!silent) {
@@ -312,6 +313,22 @@ async function deleteOneVideo(video) {
     load(page.value);
   } catch (err) {
     alert("刪除失敗：" + err.message);
+  }
+}
+
+async function editVideo(video) {
+  const newTitle = prompt("請輸入新的影片檔名：", video.title);
+  if (newTitle === null) return;
+  const trimmed = newTitle.trim();
+  if (!trimmed) {
+    alert("影片檔名不能為空");
+    return;
+  }
+  try {
+    await updateVideo(video.id, { title: trimmed });
+    load(page.value, true);
+  } catch (err) {
+    alert("修改檔名失敗：" + (err.response?.data?.message || err.message));
   }
 }
 
@@ -655,11 +672,19 @@ function formatDate(value) {
                 <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
               </svg>
               <span class="row-name">{{ video.title }}</span>
-              <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">上傳中</span>
+              <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">
+                <span class="spinner-tiny" style="border-left-color: #d97706;"></span>
+                <span>轉碼中...</span>
+              </span>
             </div>
             <div class="col-date">{{ formatDate(video.createdAt) }}</div>
             <div class="col-size">{{ formatSize(video.fileSize) }}</div>
             <div class="col-actions" @click.stop>
+              <button class="row-action-btn edit" title="修改檔名" @click="editVideo(video)" style="margin-right: 4px; background: rgba(255, 255, 255, 0.12) !important; color: var(--text-primary) !important;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+              </button>
               <button class="row-action-btn delete" title="刪除影片" @click="deleteOneVideo(video)">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                   <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -1219,6 +1244,9 @@ function formatDate(value) {
   background: rgba(245, 158, 11, 0.1);
   color: #d97706;
   border: 1px solid rgba(245, 158, 11, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ===== 格狀視圖：文件夾 ===== */
