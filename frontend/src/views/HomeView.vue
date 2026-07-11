@@ -733,6 +733,11 @@ function formatDate(value) {
                 <div class="folder-card-date">{{ formatDate(folder.createdAt) }}</div>
               </div>
               <div class="folder-card-actions" @click.stop>
+                <button class="row-action-btn edit-btn" @click="editFolder(folder)" title="重新命名">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                  </svg>
+                </button>
                 <button class="row-action-btn delete" @click="deleteFolder(folder)" title="刪除">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -1331,7 +1336,7 @@ function formatDate(value) {
 }
 
 .folder-edit-inline-btn {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 20px;
@@ -1531,6 +1536,7 @@ function formatDate(value) {
   }
 
   .folder-edit-inline-btn {
+    display: flex !important;
     width: 24px;
     height: 24px;
     background: rgba(255, 255, 255, 0.12) !important;

@@ -66,7 +66,7 @@ public class Video {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     @Builder.Default
     private Integer transcodeProgress = 0;
 
