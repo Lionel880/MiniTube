@@ -503,14 +503,7 @@ function formatDate(value) {
             <span>{{ uploadStore.progress }}%</span>
           </div>
 
-          <!-- 每頁筆數選擇 -->
-          <div class="size-select-container">
-            <select v-model="size" class="nav-select" title="每頁顯示影片數量">
-              <option :value="30">30 筆/頁</option>
-              <option :value="50">50 筆/頁</option>
-              <option :value="100">100 筆/頁</option>
-            </select>
-          </div>
+
 
           <!-- 一鍵刪除當前目錄下所有影片 -->
           <button class="nav-icon-btn" style="color: var(--danger-color);" @click="clearCurrentDirectoryVideos" title="一鍵清空此目錄影片">
@@ -746,11 +739,24 @@ function formatDate(value) {
         </template>
       </template>
 
-      <!-- 分頁 -->
-      <div v-if="totalPages > 1" class="pagination">
-        <button class="btn" type="button" :disabled="page === 0" @click="prevPage">上一頁</button>
-        <span>{{ page + 1 }} / {{ totalPages }}</span>
-        <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
+      <!-- 分頁與每頁數量選擇 -->
+      <div class="pagination-container">
+        <!-- 分頁控制（只有總頁數大於 1 時才顯示） -->
+        <div class="pagination-controls" v-if="totalPages > 1">
+          <button class="btn" type="button" :disabled="page === 0" @click="prevPage">上一頁</button>
+          <span class="page-indicator">{{ page + 1 }} / {{ totalPages }}</span>
+          <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
+        </div>
+
+        <!-- 每頁數量選擇，永遠顯示 -->
+        <div class="page-size-selector">
+          <span class="select-label">每頁顯示：</span>
+          <select v-model="size" class="nav-select bottom-select">
+            <option :value="30">30 筆</option>
+            <option :value="50">50 筆</option>
+            <option :value="100">100 筆</option>
+          </select>
+        </div>
       </div>
 
     </template>
@@ -1429,6 +1435,44 @@ function formatDate(value) {
   padding-top: 8px;
 }
 
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.page-indicator {
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: center;
+}
+
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.bottom-select {
+  height: 30px !important;
+  padding: 2px 6px !important;
+}
+
 /* ===== 響應式 ===== */
 @media (max-width: 768px) {
   .action-bar-right {
@@ -1472,6 +1516,12 @@ function formatDate(value) {
 
   .folders-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 24px;
   }
 }
 
