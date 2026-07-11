@@ -362,28 +362,30 @@ public class VideoService {
                 .createdAt(video.getCreatedAt())
                 .folderId(video.getFolder() == null ? null : video.getFolder().getId())
                 .folderName(video.getFolder() == null ? null : video.getFolder().getName())
+                .transcodeProgress(video.getTranscodeProgress())
                 .build();
-    }
+     }
 
-    /** 舊資料的 fileSize 可能是 NULL，直接 unboxing 會 NPE，一律以 0 代替。 */
-    private long safeFileSize(Video video) {
-        return video.getFileSize() == null ? 0L : video.getFileSize();
-    }
+     /** 舊資料的 fileSize 可能是 NULL，直接 unboxing 會 NPE，一律以 0 代替。 */
+     private long safeFileSize(Video video) {
+         return video.getFileSize() == null ? 0L : video.getFileSize();
+     }
 
-    private VideoDetailResponse toDetailResponse(Video video, String currentUsername) {
-        return VideoDetailResponse.builder()
-                .id(video.getId())
-                .title(video.getTitle())
-                .description(video.getDescription())
-                .videoUrl("/api/videos/" + video.getId() + "/stream/video.mp4")
-                .coverUrl(video.getCoverUrl() == null ? null : "/api/videos/" + video.getId() + "/cover")
-                .uploaderUsername(video.getUploader().getUsername())
-                .viewCount(video.getViewCount())
-                .fileSize(safeFileSize(video))
-                .status(video.getStatus())
-                .createdAt(video.getCreatedAt())
-                .folderId(video.getFolder() == null ? null : video.getFolder().getId())
-                .folderName(video.getFolder() == null ? null : video.getFolder().getName())
-                .build();
-    }
+     private VideoDetailResponse toDetailResponse(Video video, String currentUsername) {
+         return VideoDetailResponse.builder()
+                 .id(video.getId())
+                 .title(video.getTitle())
+                 .description(video.getDescription())
+                 .videoUrl("/api/videos/" + video.getId() + "/stream/video.mp4")
+                 .coverUrl(video.getCoverUrl() == null ? null : "/api/videos/" + video.getId() + "/cover")
+                 .uploaderUsername(video.getUploader().getUsername())
+                 .viewCount(video.getViewCount())
+                 .fileSize(safeFileSize(video))
+                 .status(video.getStatus())
+                 .createdAt(video.getCreatedAt())
+                 .folderId(video.getFolder() == null ? null : video.getFolder().getId())
+                 .folderName(video.getFolder() == null ? null : video.getFolder().getName())
+                 .transcodeProgress(video.getTranscodeProgress())
+                 .build();
+     }
 }

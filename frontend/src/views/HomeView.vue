@@ -674,7 +674,7 @@ function formatDate(value) {
               <span class="row-name">{{ video.title }}</span>
               <span v-if="video.status === 'UPLOADING'" class="status-badge uploading">
                 <span class="spinner-tiny" style="border-left-color: #d97706;"></span>
-                <span>轉碼中...</span>
+                <span>轉碼中 {{ video.transcodeProgress || 0 }}%</span>
               </span>
             </div>
             <div class="col-date">{{ formatDate(video.createdAt) }}</div>
@@ -1550,6 +1550,17 @@ function formatDate(value) {
     flex-direction: column;
     gap: 16px;
     margin-top: 24px;
+  }
+
+  .status-badge {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+  }
+
+  .status-badge .spinner-tiny {
+    width: 9px !important;
+    height: 9px !important;
+    border-width: 1.5px !important;
   }
 }
 

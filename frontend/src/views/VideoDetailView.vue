@@ -220,7 +220,7 @@ onMounted(() => load());
       <div class="video-player-container">
         <div v-if="video.status === 'UPLOADING'" class="transcoding-placeholder">
           <div class="spinner"></div>
-          <p>影片正在背景轉碼中，請稍候再試...</p>
+          <p>影片正在背景轉碼中，目前進度：{{ video.transcodeProgress || 0 }}%</p>
           <button class="btn primary refresh-status-btn" type="button" @click="load()">🔄 重整狀態</button>
         </div>
         <div v-else-if="video.status === 'FAILED'" class="transcoding-placeholder failed-placeholder">

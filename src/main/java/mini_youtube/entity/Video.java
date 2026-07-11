@@ -66,6 +66,10 @@ public class Video {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer transcodeProgress = 0;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -74,6 +78,9 @@ public class Video {
         }
         if (this.status == null) {
             this.status = VideoStatus.READY;
+        }
+        if (this.transcodeProgress == null) {
+            this.transcodeProgress = 0;
         }
     }
 }

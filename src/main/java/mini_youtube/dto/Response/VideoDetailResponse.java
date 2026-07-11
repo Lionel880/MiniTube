@@ -27,4 +27,5 @@ public class VideoDetailResponse {
     private LocalDateTime createdAt;
     private Long folderId;
     private String folderName;
+    private Integer transcodeProgress;
 }

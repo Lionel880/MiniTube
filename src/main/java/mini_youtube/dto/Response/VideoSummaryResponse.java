@@ -24,4 +24,5 @@ public class VideoSummaryResponse {
     private LocalDateTime createdAt;
     private Long folderId;
     private String folderName;
+    private Integer transcodeProgress;
 }

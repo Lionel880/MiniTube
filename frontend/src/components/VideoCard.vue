@@ -119,7 +119,7 @@ function formatSize(bytes) {
       <img v-if="coverBlobUrl" :src="coverBlobUrl" class="thumb-img" alt="cover" />
       <div v-else class="thumb"></div>
       <div v-if="video.status === 'UPLOADING'" class="status-overlay processing">
-        <div class="spinner-small"></div> 轉碼中...
+        <div class="spinner-small"></div> 轉碼中 {{ video.transcodeProgress || 0 }}%
       </div>
       <div v-else-if="video.status === 'FAILED'" class="status-overlay failed">
         轉碼失敗

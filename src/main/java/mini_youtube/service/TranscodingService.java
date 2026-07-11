@@ -96,12 +96,13 @@ public class TranscodingService {
                 synchronized (lock) {
                     mediaObject = new MultimediaObject(source);
                 }
+                long durationMs = mediaObject.getInfo().getDuration();
                 String videoCodec = "";
                 if (mediaObject.getInfo().getVideo() != null) {
                     videoCodec = mediaObject.getInfo().getVideo().getDecoder();
                 }
                 String format = mediaObject.getInfo().getFormat();
-                log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}", format, videoCodec);
+                log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}, 總長度 = {} ms", format, videoCodec, durationMs);
 
                 // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接進行無損複製並套用 faststart 最佳化，跳過耗時的影像重編碼
                 if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
@@ -117,6 +118,7 @@ public class TranscodingService {
                         video.setFilePath(newStoredFilename);
                         video.setFileSize(target.length());
                         video.setStatus(VideoStatus.READY);
+                        video.setTranscodeProgress(100);
                         videoRepository.save(video);
                         
                         // 刪除原始上傳的檔案
@@ -128,13 +130,14 @@ public class TranscodingService {
                             video.setCoverUrl(coverFilename);
                         }
                         video.setStatus(VideoStatus.READY);
+                        video.setTranscodeProgress(100);
                         videoRepository.save(video);
                     }
                     return;
                 }
 
                 log.info("正在執行 FFmpeg 轉碼 (目標檔名: {})...", newStoredFilename);
-                boolean transcodeSuccess = runTranscodeCommand(sourcePath, targetPath);
+                boolean transcodeSuccess = runTranscodeCommand(sourcePath, targetPath, videoId, durationMs);
                 if (!transcodeSuccess) {
                     throw new RuntimeException("FFmpeg 轉碼命令行執行失敗");
                 }
@@ -148,6 +151,7 @@ public class TranscodingService {
                 video.setFilePath(newStoredFilename);
                 video.setFileSize(target.length());
                 video.setStatus(VideoStatus.READY);
+                video.setTranscodeProgress(100);
                 videoRepository.save(video);
 
                 // 刪除原始上傳的檔案 (如果是不同檔案才刪除)
@@ -169,7 +173,7 @@ public class TranscodingService {
         }
     }
 
-    private boolean runTranscodeCommand(Path sourcePath, Path targetPath) {
+    private boolean runTranscodeCommand(Path sourcePath, Path targetPath, Long videoId, long durationMs) {
         try {
             ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator locator = new ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator();
             String ffmpegPath = locator.getExecutablePath();
@@ -191,11 +195,30 @@ public class TranscodingService {
             pb.redirectErrorStream(true);
             Process process = pb.start();
             
-            // 關鍵防卡死：異步讀取並消耗輸出流，避免作業系統的 Pipe Buffer 被塞滿導致進程掛起
+            int lastProgress = 0;
+            
             try (java.io.BufferedReader reader = new java.io.BufferedReader(
                     new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                while (reader.readLine() != null) {
-                    // 靜默消耗輸出
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    int timeIdx = line.indexOf("time=");
+                    if (timeIdx != -1) {
+                        String timeStr = line.substring(timeIdx + 5).trim();
+                        int spaceIdx = timeStr.indexOf(" ");
+                        if (spaceIdx != -1) {
+                            timeStr = timeStr.substring(0, spaceIdx);
+                        }
+                        
+                        long currentMs = parseTimeStrToMs(timeStr);
+                        if (durationMs > 0 && currentMs > 0) {
+                            int progress = (int) ((currentMs * 100) / durationMs);
+                            progress = Math.min(progress, 99);
+                            if (progress > lastProgress) {
+                                lastProgress = progress;
+                                updateTranscodeProgress(videoId, progress);
+                            }
+                        }
+                    }
                 }
             }
             
@@ -206,6 +229,33 @@ public class TranscodingService {
             log.error("執行影片轉碼命令發生異常", e);
         }
         return false;
+    }
+
+    private long parseTimeStrToMs(String timeStr) {
+        try {
+            String[] parts = timeStr.split(":");
+            if (parts.length == 3) {
+                double hours = Double.parseDouble(parts[0]);
+                double minutes = Double.parseDouble(parts[1]);
+                double seconds = Double.parseDouble(parts[2]);
+                return (long) ((hours * 3600 + minutes * 60 + seconds) * 1000);
+            }
+        } catch (Exception e) {
+            // 忽略
+        }
+        return -1;
+    }
+
+    private void updateTranscodeProgress(Long videoId, int progress) {
+        try {
+            Video video = videoRepository.findById(videoId).orElse(null);
+            if (video != null) {
+                video.setTranscodeProgress(progress);
+                videoRepository.save(video);
+            }
+        } catch (Exception e) {
+            log.error("更新轉碼進度失敗, ID: {}, progress: {}", videoId, progress, e);
+        }
     }
 
     private void safeDeleteSourceFile(Path path, String storedFilename) {
@@ -284,6 +334,11 @@ public class TranscodingService {
 
     private void updateStatus(Video video, VideoStatus status) {
         video.setStatus(status);
+        if (status == VideoStatus.READY) {
+            video.setTranscodeProgress(100);
+        } else if (status == VideoStatus.FAILED) {
+            video.setTranscodeProgress(0);
+        }
         videoRepository.save(video);
     }
 
