@@ -30,6 +30,31 @@ export function uploadVideo({ title, description, folderId, file }, onUploadProg
     .then((res) => res.data);
 }
 
+export function uploadVideoChunk({ uploadId, chunkIndex, totalChunks, title, description, folderId, videoId, file }, onUploadProgress, signal) {
+  const formData = new FormData();
+  formData.append("uploadId", uploadId);
+  formData.append("chunkIndex", chunkIndex);
+  formData.append("totalChunks", totalChunks);
+  formData.append("title", title);
+  formData.append("description", description || "");
+  if (folderId) {
+    formData.append("folderId", folderId);
+  }
+  if (videoId) {
+    formData.append("videoId", videoId);
+  }
+  formData.append("file", file);
+
+  return http
+    .post("/videos/upload/chunk", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress,
+      timeout: 0,
+      signal
+    })
+    .then((res) => res.data);
+}
+
 export function uploadVideosBatch(files, folderId, onUploadProgress) {
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {

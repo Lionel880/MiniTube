@@ -103,17 +103,6 @@ function clearApiUrl() {
   <header class="navbar">
     <div class="brand-group">
       <RouterLink class="brand" :to="{ name: 'home' }">Mini<span>Tube</span></RouterLink>
-      
-      <!-- 背景上傳微縮指示器 -->
-      <div v-if="uploadStore.isUploading" class="navbar-upload-indicator" @click="router.push({ name: 'upload' })" title="點擊查看上傳詳情">
-        <div class="navbar-spinner"></div>
-        <span class="indicator-text">
-          <span class="text-long">背景上傳中... </span>
-          <span class="text-short">上傳中 </span>
-          {{ uploadStore.progress }}%
-          <span class="text-long"> ({{ uploadStore.filesCount }} 部影片)</span>
-        </span>
-      </div>
     </div>
 
     <!-- 搜尋框 (登入後且非首頁、影片詳細頁與上傳頁時顯示) -->
@@ -124,8 +113,15 @@ function clearApiUrl() {
 
     <div class="nav-actions">
       <template v-if="authStore.isLoggedIn">
-        <!-- 上傳按鈕 (首頁與上傳頁時隱藏，避免重複) -->
-        <RouterLink v-if="route.name !== 'home' && route.name !== 'upload'" class="btn primary" :to="{ name: 'upload' }">上傳影片</RouterLink>
+        <!-- 上傳按鈕：在上傳中顯示進度並對所有頁面可見，非上傳中則只在特定頁面顯示 -->
+        <RouterLink
+          v-if="route.name !== 'upload' && (uploadStore.isUploading || route.name !== 'home')"
+          class="btn primary"
+          :class="{ 'uploading-btn': uploadStore.isUploading }"
+          :to="{ name: 'upload' }"
+        >
+          {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : '上傳影片' }}
+        </RouterLink>
         <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
         <button class="btn danger" type="button" @click="onLogout">登出</button>
       </template>
@@ -331,8 +327,15 @@ function clearApiUrl() {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.9; }
-  50% { opacity: 0.6; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.uploading-btn {
+  background: var(--accent-orange, #ff7a00) !important;
+  border-color: var(--accent-orange, #ff7a00) !important;
+  color: #fff !important;
+  animation: pulse 2s infinite ease-in-out;
 }
 
 .text-short {

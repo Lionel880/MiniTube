@@ -57,6 +57,40 @@ public class TranscodingService {
 
     @Async
     @Transactional
+    public void mergeAndTranscode(Long videoId, String uploadId, int totalChunks, String folderName, String originalFilename) {
+        log.info("開始背景合併與轉碼影片 ID: {}, uploadId: {}", videoId, uploadId);
+        try {
+            String storedFilename = fileStorageService.mergeChunks(uploadId, totalChunks, folderName, originalFilename);
+            
+            Video video = videoRepository.findById(videoId).orElse(null);
+            if (video == null) {
+                log.error("背景合併時找不到影片 ID: {}", videoId);
+                return;
+            }
+            video.setFilePath(storedFilename);
+            
+            long fileSize = 0;
+            try {
+                Path targetPath = fileStorageService.resolve(storedFilename);
+                fileSize = Files.size(targetPath);
+            } catch (Exception e) {
+                // ignore
+            }
+            video.setFileSize(fileSize);
+            videoRepository.save(video);
+            
+            this.transcodeToMp4(videoId, storedFilename);
+        } catch (Exception e) {
+            log.error("背景合併或轉碼失敗, ID: {}", videoId, e);
+            Video video = videoRepository.findById(videoId).orElse(null);
+            if (video != null) {
+                updateStatus(video, VideoStatus.FAILED);
+            }
+        }
+    }
+
+    @Async
+    @Transactional
     public void transcodeToMp4(Long videoId, String storedFilename) {
         log.info("開始背景轉碼影片 ID: {}, 檔案: {}", videoId, storedFilename);
 
@@ -98,18 +132,25 @@ public class TranscodingService {
             File source = sourcePath.toFile();
             File target = targetPath.toFile();
 
+            long durationMs = -1;
+            String videoCodec = "";
+            String format = "";
             try {
                 MultimediaObject mediaObject;
                 synchronized (lock) {
                     mediaObject = new MultimediaObject(source);
                 }
-                long durationMs = mediaObject.getInfo().getDuration();
-                String videoCodec = "";
+                durationMs = mediaObject.getInfo().getDuration();
                 if (mediaObject.getInfo().getVideo() != null) {
                     videoCodec = mediaObject.getInfo().getVideo().getDecoder();
                 }
-                String format = mediaObject.getInfo().getFormat();
+                format = mediaObject.getInfo().getFormat();
                 log.info("影片詳細資訊: 封裝格式 = {}, 影像編碼 = {}, 總長度 = {} ms", format, videoCodec, durationMs);
+            } catch (Exception e) {
+                log.warn("Jave2 無法讀取影片 metadata (可能包含不相容軌道或 HEVC 格式)，設定為默認值並直接進入 FFmpeg 轉碼: {}", e.getMessage());
+            }
+
+            try {
 
                 // 檢查如果已經是 h264 編碼且封裝是 mp4，則可以直接進行無損複製並套用 faststart 最佳化，跳過耗時的影像重編碼
                 if ("h264".equalsIgnoreCase(videoCodec) && ("mp4".equalsIgnoreCase(format) || format.toLowerCase().contains("mp4"))) {
@@ -268,8 +309,20 @@ public class TranscodingService {
                 targetPath.toAbsolutePath().toString()
             );
             
-            pb.redirectErrorStream(true);
             Process process = pb.start();
+            
+            // Consume stderr in a separate thread to prevent pipe blockage
+            new Thread(() -> {
+                try (java.io.BufferedReader errReader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String errLine;
+                    while ((errLine = errReader.readLine()) != null) {
+                        // Consuming silently, or could log at trace/debug if needed
+                    }
+                } catch (Exception e) {
+                    // ignore
+                }
+            }).start();
             
             int lastProgress = 0;
             
@@ -277,9 +330,10 @@ public class TranscodingService {
                     new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("out_time_us=")) {
+                    if (line.contains("out_time_us=")) {
                         try {
-                            long currentUs = Long.parseLong(line.substring(12).trim());
+                            int index = line.indexOf("out_time_us=");
+                            long currentUs = Long.parseLong(line.substring(index + 12).trim());
                             long currentMs = currentUs / 1000;
                             if (durationMs > 0 && currentMs > 0) {
                                 int progress = (int) ((currentMs * 100) / durationMs);

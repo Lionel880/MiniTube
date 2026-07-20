@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getVideo, updateVideo } from "../api/video";
+import { getVideo, updateVideo, listVideos } from "../api/video";
 import { useAuthStore } from "../store/auth";
 import { useVideoStateStore } from "../store/videoState";
 
@@ -141,11 +141,29 @@ async function load(silent = false) {
   }
   try {
     video.value = await getVideo(props.id);
+    
+    // 如果播放清單為空，或者目前影片不在播放清單中，主動載入影片所屬資料夾（包含多層夾中夾）之全部影片作為播放清單！
+    const currentId = Number(props.id);
+    const hasCurrent = videoStateStore.videos && videoStateStore.videos.some(v => v.id === currentId);
+    if (!hasCurrent) {
+      try {
+        const folderIdStr = video.value.folderId === null ? "root" : video.value.folderId.toString();
+        const data = await listVideos({
+          folderId: folderIdStr,
+          page: 0,
+          size: 1000,
+          sortBy: videoStateStore.sortBy || "createdAt",
+          sortDir: videoStateStore.sortDir || "desc"
+        });
+        videoStateStore.videos = data.videos || [];
+      } catch (err) {
+        console.error("無法加載同目錄影片播放清單", err);
+      }
+    }
   } catch (err) {
     if (!silent) {
       errorMessage.value = err.message;
     }
-    // 背景輪詢失敗就靜默略過，下一次輪詢還會再試，不用打斷使用者
   } finally {
     if (!silent) {
       loading.value = false;

@@ -70,7 +70,7 @@ public class FileStorageService {
         }
 
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase().startsWith("video/")) {
+        if (contentType != null && !contentType.toLowerCase().startsWith("video/") && !contentType.equalsIgnoreCase("application/octet-stream")) {
             throw new BusinessException("檔案內容類型不是有效的影片格式");
         }
 
@@ -100,6 +100,112 @@ public class FileStorageService {
         } catch (IOException e) {
             throw new BusinessException("影片儲存失敗，請稍後再試", e);
         }
+
+        if (folderName != null && !folderName.isBlank()) {
+            String cleanFolderName = StringUtils.cleanPath(folderName).replace("/", "").replace("\\", "");
+            return cleanFolderName + "/" + storedFilename;
+        } else {
+            return storedFilename;
+        }
+    }
+
+    public Path getTempUploadDir(String uploadId) {
+        return this.uploadDir.resolve("temp").resolve(uploadId).normalize();
+    }
+
+    public boolean storeChunk(String uploadId, int chunkIndex, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("分片檔案為空");
+        }
+        Path tempDir = getTempUploadDir(uploadId);
+        try {
+            Files.createDirectories(tempDir);
+            Path chunkPath = tempDir.resolve(String.valueOf(chunkIndex));
+            Files.copy(file.getInputStream(), chunkPath, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException e) {
+            throw new BusinessException("無法儲存分片檔案", e);
+        }
+    }
+
+    public boolean isAllChunksUploaded(String uploadId, int totalChunks) {
+        Path tempDir = getTempUploadDir(uploadId);
+        if (!Files.exists(tempDir)) {
+            return false;
+        }
+        for (int i = 0; i < totalChunks; i++) {
+            Path chunkPath = tempDir.resolve(String.valueOf(i));
+            if (!Files.exists(chunkPath)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public String mergeChunks(String uploadId, int totalChunks, String folderName, String originalFilename) {
+        Path tempDir = getTempUploadDir(uploadId);
+        if (!Files.exists(tempDir)) {
+            throw new BusinessException("找不到分片暫存目錄");
+        }
+
+        String cleanFilename = StringUtils.cleanPath(originalFilename == null ? "video.mp4" : originalFilename);
+        String extension = "";
+        String baseName = cleanFilename;
+        int dotIndex = cleanFilename.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = cleanFilename.substring(dotIndex).toLowerCase();
+            baseName = cleanFilename.substring(0, dotIndex);
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new BusinessException("不支援的影片格式，僅支援：" + String.join(", ", ALLOWED_EXTENSIONS));
+        }
+
+        Path targetDir = this.uploadDir;
+        if (folderName != null && !folderName.isBlank()) {
+            String cleanFolderName = StringUtils.cleanPath(folderName).replace("/", "").replace("\\", "");
+            targetDir = this.uploadDir.resolve(cleanFolderName);
+        }
+
+        try {
+            Files.createDirectories(targetDir);
+        } catch (IOException e) {
+            throw new BusinessException("無法建立影片儲存目錄", e);
+        }
+
+        String storedFilename = cleanFilename;
+        Path target = targetDir.resolve(storedFilename);
+        int count = 1;
+        while (Files.exists(target)) {
+            storedFilename = baseName + "_" + count + extension;
+            target = targetDir.resolve(storedFilename);
+            count++;
+        }
+
+        try (java.io.OutputStream out = Files.newOutputStream(target)) {
+            for (int i = 0; i < totalChunks; i++) {
+                Path chunkPath = tempDir.resolve(String.valueOf(i));
+                Files.copy(chunkPath, out);
+            }
+        } catch (IOException e) {
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException ex) {
+                // ignore
+            }
+            throw new BusinessException("分片合併失敗，請稍後再試", e);
+        }
+
+        new Thread(() -> {
+            try {
+                for (int i = 0; i < totalChunks; i++) {
+                    Files.deleteIfExists(tempDir.resolve(String.valueOf(i)));
+                }
+                Files.deleteIfExists(tempDir);
+            } catch (Exception e) {
+                // ignore
+            }
+        }).start();
 
         if (folderName != null && !folderName.isBlank()) {
             String cleanFolderName = StringUtils.cleanPath(folderName).replace("/", "").replace("\\", "");

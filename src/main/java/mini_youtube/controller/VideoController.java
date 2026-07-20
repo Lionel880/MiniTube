@@ -53,6 +53,20 @@ public class VideoController {
         return videoService.upload(authentication.getName(), title, description, folderId, file);
     }
 
+    @PostMapping(value = "/upload/chunk")
+    public VideoDetailResponse uploadChunk(
+            Authentication authentication,
+            @RequestParam("uploadId") String uploadId,
+            @RequestParam("chunkIndex") int chunkIndex,
+            @RequestParam("totalChunks") int totalChunks,
+            @RequestParam("title") String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "folderId", required = false) Long folderId,
+            @RequestParam(value = "videoId", required = false) Long videoId,
+            @RequestPart("file") MultipartFile file) {
+        return videoService.uploadChunk(authentication.getName(), uploadId, chunkIndex, totalChunks, title, description, folderId, videoId, file);
+    }
+
     @PostMapping(value = "/upload/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<VideoDetailResponse> uploadBatch(
             Authentication authentication,

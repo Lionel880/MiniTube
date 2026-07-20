@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useUploadStore } from "../store/upload";
 
@@ -7,6 +7,7 @@ const router = useRouter();
 const uploadStore = useUploadStore();
 
 onMounted(() => {
+  // 不要在重新整理時隨意清空正在上傳的佇列
   if (!uploadStore.isUploading) {
     uploadStore.queue = [];
     uploadStore.errorMessage = "";
@@ -14,8 +15,6 @@ onMounted(() => {
   }
 });
 
-const title = ref("");
-const files = ref([]);
 const errorMessage = ref("");
 const fileInput = ref(null);
 const folderInput = ref(null);
@@ -26,13 +25,31 @@ const ALLOWED_EXTENSIONS = [
   ".flv", ".3gp", ".wmv", ".m4v", ".mpg", ".mpeg"
 ];
 
+const selectedIds = ref([]);
+
+// 僅可取消等待中或上傳中的項目
+const cancellableQueue = computed(() => {
+  return uploadStore.queue.filter(item => ["waiting", "uploading"].includes(item.status));
+});
+
+const isAllSelected = computed({
+  get() {
+    return cancellableQueue.value.length > 0 && selectedIds.value.length === cancellableQueue.value.length;
+  },
+  set(val) {
+    if (val) {
+      selectedIds.value = cancellableQueue.value.map(item => item.id);
+    } else {
+      selectedIds.value = [];
+    }
+  }
+});
+
 function triggerFileInput() {
-  if (uploadStore.isUploading) return;
   fileInput.value.click();
 }
 
 function triggerFolderInput() {
-  if (uploadStore.isUploading) return;
   folderInput.value.click();
 }
 
@@ -43,7 +60,6 @@ function onFolderChange(event) {
 }
 
 function onDragOver() {
-  if (uploadStore.isUploading) return;
   isDragOver.value = true;
 }
 
@@ -52,7 +68,6 @@ function onDragLeave() {
 }
 
 async function onDrop(event) {
-  if (uploadStore.isUploading) return;
   isDragOver.value = false;
   
   const items = event.dataTransfer.items;
@@ -116,12 +131,11 @@ function readAllEntries(dirReader) {
 function onFileChange(event) {
   const selectedList = Array.from(event.target.files);
   processSelectedFiles(selectedList);
-  event.target.value = ""; // 重設以利重複選取同檔案
+  event.target.value = ""; 
 }
 
 function processSelectedFiles(selectedList) {
   errorMessage.value = "";
-  files.value = [];
 
   if (selectedList.length === 0) {
     return;
@@ -142,186 +156,218 @@ function processSelectedFiles(selectedList) {
     return;
   }
 
-  files.value = validFiles;
-  if (files.value.length === 1) {
-    const name = files.value[0].name;
-    const dotIndex = name.lastIndexOf('.');
-    title.value = dotIndex >= 0 ? name.substring(0, dotIndex) : name;
-  }
-}
-
-function onCancel() {
-  if (uploadStore.isUploading) return;
-  router.push({ name: "home" });
-}
-
-async function onSubmit() {
-  errorMessage.value = "";
-
-  if (files.value.length === 0) {
-    errorMessage.value = "請選擇要上傳的影片檔案";
-    return;
-  }
-
   const activeFolderId = sessionStorage.getItem("minitube_active_folder_id");
   const folderId = activeFolderId && activeFolderId !== "null" ? Number(activeFolderId) : null;
 
-  if (files.value.length === 1) {
-    uploadStore.startUploadSingle({
-      title: title.value,
-      folderId: folderId,
-      file: files.value[0]
-    });
-  } else {
-    uploadStore.startUploadBatch(files.value, folderId);
-  }
+  // 拖曳或選取影片檔案後，立即開始分片上傳
+  uploadStore.addFilesToQueue(validFiles, folderId);
+}
+
+function goBack() {
+  router.go(-1);
+}
+
+function handleCancelSingle(id) {
+  uploadStore.cancelUpload(id);
+  selectedIds.value = selectedIds.value.filter(x => x !== id);
+}
+
+function handleCancelSelected() {
+  uploadStore.cancelSelected(selectedIds.value);
+  selectedIds.value = [];
+}
+
+function handleClearFinished() {
+  uploadStore.clearFinishedQueue();
+  selectedIds.value = [];
 }
 </script>
 
 <template>
   <div class="page">
     <div class="upload-form glass-card">
-      <button
-        class="close-btn"
-        type="button"
-        title="關閉"
-        :disabled="uploadStore.isUploading"
-        @click="onCancel"
-      >
-        ✕
-      </button>
+      <!-- 頂部返回與關閉按鈕區 -->
+      <div class="top-nav-bar">
+        <button class="btn-back" @click="goBack">
+          ← 返回上一頁
+        </button>
+        <button
+          class="close-btn-custom"
+          type="button"
+          title="返回首頁"
+          @click="router.push({ name: 'home' })"
+        >
+          ✕
+        </button>
+      </div>
+
       <h2>上傳影片</h2>
 
       <p v-if="errorMessage || uploadStore.errorMessage" class="error-message">
         {{ errorMessage || uploadStore.errorMessage }}
       </p>
 
-      <form @submit.prevent="onSubmit">
-        <!-- 拖曳上傳框 -->
-        <div 
-          class="drag-drop-zone" 
-          :class="{ dragover: isDragOver }"
-          @dragover.prevent="onDragOver"
-          @dragleave.prevent="onDragLeave"
-          @drop.prevent="onDrop"
-          @click="triggerFileInput"
+      <!-- 拖曳上傳框 -->
+      <div 
+        class="drag-drop-zone" 
+        :class="{ dragover: isDragOver }"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDrop"
+        @click="triggerFileInput"
+      >
+        <input 
+          id="file" 
+          ref="fileInput"
+          type="file" 
+          accept="video/*" 
+          multiple 
+          @change="onFileChange" 
+          class="hidden-file-input"
+        />
+        <div class="drag-drop-content">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor" class="upload-icon">
+            <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+          </svg>
+          <p>拖曳影片檔案至此處，或點擊選擇檔案即刻上傳</p>
+          <span class="file-hint">支援 MP4, WebM, MKV, AVI, MOV 等影片格式</span>
+        </div>
+      </div>
+
+      <!-- 資料夾上傳按鈕 -->
+      <div class="folder-upload-actions" style="margin-bottom: 24px; text-align: center;">
+        <input
+          id="folderInput"
+          ref="folderInput"
+          type="file"
+          webkitdirectory
+          directory
+          multiple
+          style="display: none;"
+          @change="onFolderChange"
+        />
+        <button
+          class="btn secondary"
+          type="button"
+          style="max-width: 250px; margin: 0 auto;"
+          @click="triggerFolderInput"
         >
-          <input 
-            id="file" 
-            ref="fileInput"
-            type="file" 
-            accept="video/*" 
-            multiple 
-            @change="onFileChange" 
-            :disabled="uploadStore.isUploading" 
-            class="hidden-file-input"
-          />
-          <div class="drag-drop-content">
-            <svg viewBox="0 0 24 24" width="40" height="40" fill="currentColor" class="upload-icon">
-              <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
-            </svg>
-            <p v-if="files.length === 0">拖曳影片檔案至此處，或點擊選擇檔案上傳</p>
-            <p v-else class="selected-text">已選擇 {{ files.length }} 個影片檔案</p>
-            <span class="file-hint">支援 MP4, WebM, MKV, AVI, MOV 等影片格式</span>
+          📂 選擇整個資料夾直接上傳
+        </button>
+      </div>
+
+      <!-- 全局進度與狀態摘要 -->
+      <div v-if="uploadStore.queue.length > 0" class="upload-summary-panel">
+        <div class="overall-progress-row">
+          <span class="overall-label">總上傳進度：</span>
+          <span class="overall-percentage">{{ uploadStore.progress }}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="fill" :style="{ width: uploadStore.progress + '%' }"></div>
+        </div>
+        <div v-if="!uploadStore.isUploading" class="summary-status-alert">
+          <div v-if="uploadStore.errorMessage" class="alert-box error-alert">
+            ⚠️ 部分影片上傳失敗，詳細錯誤請見下方列表。
+          </div>
+          <div v-else class="alert-box success-alert">
+            🎉 所有影片已完成上傳與發送背景合併！
           </div>
         </div>
+      </div>
 
-        <div v-if="uploadStore.queue.length === 0" class="folder-upload-actions" style="margin-bottom: 24px; text-align: center;">
-          <input
-            id="folderInput"
-            ref="folderInput"
-            type="file"
-            webkitdirectory
-            directory
-            multiple
-            style="display: none;"
-            @change="onFolderChange"
-            :disabled="uploadStore.isUploading"
-          />
-          <button
-            class="btn secondary"
-            type="button"
-            style="max-width: 250px; margin: 0 auto;"
-            :disabled="uploadStore.isUploading"
-            @click="triggerFolderInput"
-          >
-            📂 選擇整個資料夾上傳
-          </button>
-        </div>
-
-        <!-- 只有在單檔上傳時顯示標題輸入欄位 -->
-        <template v-if="files.length === 1 && uploadStore.queue.length === 0">
-          <div class="field">
-            <label for="title">標題（必填，最多 200 字）</label>
-            <input id="title" v-model="title" type="text" maxlength="200" :disabled="uploadStore.isUploading" required />
-          </div>
-        </template>
-
-        <!-- 批量上傳提示 (尚未上傳時顯示) -->
-        <div v-else-if="files.length > 1 && uploadStore.queue.length === 0" class="batch-upload-notice">
-          已選擇 <strong>{{ files.length }}</strong> 個影片，系統將會自動以檔名做為標題進行批量上傳。
-          <ul class="file-list">
-            <li v-for="(file, idx) in files" :key="idx">{{ file.name }}</li>
-          </ul>
-        </div>
-
-        <!-- 全局進度與狀態摘要 -->
-        <div v-if="uploadStore.queue.length > 0" class="upload-summary-panel">
-          <div class="overall-progress-row">
-            <span class="overall-label">總上傳進度：</span>
-            <span class="overall-percentage">{{ uploadStore.progress }}%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="fill" :style="{ width: uploadStore.progress + '%' }"></div>
-          </div>
-          <div v-if="!uploadStore.isUploading" class="summary-status-alert">
-            <div v-if="uploadStore.errorMessage" class="alert-box error-alert">
-              ⚠️ 部分影片上傳失敗，詳細錯誤請見下方列表。
-            </div>
-            <div v-else class="alert-box success-alert">
-              🎉 所有影片均已成功上傳！
-            </div>
-          </div>
-        </div>
-
-        <!-- 逐個影片佇列與個別進度 -->
-        <div v-if="uploadStore.queue.length > 0" class="upload-queue-container">
+      <!-- 逐個影片佇列與個別進度 -->
+      <div v-if="uploadStore.queue.length > 0" class="upload-queue-container">
+        <div class="queue-header-row">
           <h3>上傳清單 (共 {{ uploadStore.filesCount }} 部)</h3>
-          <div class="queue-list">
-            <div v-for="(item, idx) in uploadStore.queue" :key="idx" class="queue-item">
-              <div class="queue-item-header">
-                <span class="queue-item-name" :title="item.fileName">{{ item.fileName }}</span>
-                <span class="queue-item-status" :class="item.status">
-                  <template v-if="item.status === 'waiting'">等待中</template>
-                  <template v-else-if="item.status === 'uploading'">上傳中 {{ item.progress }}%</template>
-                  <template v-else-if="item.status === 'success'">✓ 成功</template>
-                  <template v-else-if="item.status === 'error'">✗ 失敗</template>
-                </span>
-              </div>
-              <div class="queue-item-bar-container">
-                <div class="queue-item-bar">
-                  <div class="fill" :class="item.status" :style="{ width: item.progress + '%' }"></div>
-                </div>
-              </div>
-              <p v-if="item.status === 'error' && item.errorMessage" class="queue-item-error">
-                {{ item.errorMessage }}
-              </p>
-            </div>
+          
+          <div class="queue-bulk-actions">
+            <button 
+              v-if="selectedIds.length > 0" 
+              class="btn danger-sm" 
+              type="button" 
+              @click="handleCancelSelected"
+            >
+              取消所選 ({{ selectedIds.length }})
+            </button>
+            <button 
+              v-if="!uploadStore.isUploading && uploadStore.queue.some(item => ['success', 'error', 'cancelled'].includes(item.status))"
+              class="btn secondary-sm"
+              type="button"
+              @click="handleClearFinished"
+            >
+              清除已完成
+            </button>
           </div>
         </div>
 
-        <div class="form-actions">
-          <template v-if="uploadStore.queue.length > 0 && !uploadStore.isUploading">
-            <button class="btn primary" type="button" @click="router.push({ name: 'home' })">完成並返回首頁</button>
-          </template>
-          <template v-else>
-            <button class="btn" type="button" :disabled="uploadStore.isUploading" @click="onCancel">取消</button>
-            <button class="btn primary" type="submit" :disabled="uploadStore.isUploading || files.length === 0">
-              {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : "開始上傳" }}
-            </button>
-          </template>
+        <div class="queue-list">
+          <!-- 全選控制列 -->
+          <div v-if="cancellableQueue.length > 0" class="queue-select-all-row">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="isAllSelected" />
+              <span>全選進行中項目</span>
+            </label>
+          </div>
+
+          <div v-for="item in uploadStore.queue" :key="item.id" class="queue-item">
+            <div class="queue-item-left">
+              <!-- 核取方塊 (僅限進行中任務) -->
+              <input 
+                v-if="['waiting', 'uploading'].includes(item.status)"
+                type="checkbox" 
+                :value="item.id" 
+                v-model="selectedIds"
+                class="item-checkbox" 
+              />
+              <span v-else class="checkbox-placeholder"></span>
+              
+              <div class="queue-item-info">
+                <div class="queue-item-header">
+                  <span class="queue-item-name" :title="item.fileName">{{ item.fileName }}</span>
+                  <span class="queue-item-status" :class="item.status">
+                    <template v-if="item.status === 'waiting'">等待中</template>
+                    <template v-else-if="item.status === 'uploading'">上傳中 {{ item.progress }}%</template>
+                    <template v-else-if="item.status === 'success'">✓ 完成</template>
+                    <template v-else-if="item.status === 'error'">✗ 失敗</template>
+                    <template v-else-if="item.status === 'cancelled'">已取消</template>
+                  </span>
+                </div>
+                <div class="queue-item-bar-container">
+                  <div class="queue-item-bar">
+                    <div class="fill" :class="item.status" :style="{ width: item.progress + '%' }"></div>
+                  </div>
+                </div>
+                <p v-if="item.status === 'error' && item.errorMessage" class="queue-item-error">
+                  {{ item.errorMessage }}
+                </p>
+              </div>
+            </div>
+
+            <!-- 右側操作按鈕：取消/移除 -->
+            <div class="queue-item-actions">
+              <button 
+                v-if="['waiting', 'uploading'].includes(item.status)"
+                class="btn-icon-cancel" 
+                type="button" 
+                title="取消上傳"
+                @click="handleCancelSingle(item.id)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
         </div>
-      </form>
+      </div>
+
+      <!-- 頁面底部返回按鈕 -->
+      <div class="form-actions-bottom">
+        <button class="btn secondary" type="button" @click="goBack">
+          返回上一頁
+        </button>
+        <button class="btn primary" type="button" @click="router.push({ name: 'home' })">
+          回到首頁
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -329,11 +375,36 @@ async function onSubmit() {
 <style scoped>
 .upload-form {
   position: relative;
+  padding-top: 56px;
 }
-.close-btn {
+
+.top-nav-bar {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 16px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-back {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.btn-back:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(62, 166, 255, 0.05);
+}
+
+.close-btn-custom {
   width: 32px;
   height: 32px;
   border: none;
@@ -343,25 +414,25 @@ async function onSubmit() {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-smooth);
 }
-.close-btn:hover:not(:disabled) {
+.close-btn-custom:hover {
   background: rgba(128, 128, 128, 0.35);
-}
-.close-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* 拖曳上傳框樣式 */
 .drag-drop-zone {
   border: 2px dashed var(--border-color);
   border-radius: var(--border-radius-lg);
-  padding: 48px 24px;
+  padding: 40px 20px;
   text-align: center;
   cursor: pointer;
   transition: var(--transition-smooth);
   background: rgba(255, 255, 255, 0.01);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .drag-drop-zone:hover, .drag-drop-zone.dragover {
   border-color: var(--accent-blue);
@@ -374,7 +445,7 @@ async function onSubmit() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   color: var(--text-primary);
 }
 .upload-icon {
@@ -388,37 +459,6 @@ async function onSubmit() {
 .file-hint {
   font-size: 12px;
   color: var(--text-muted);
-}
-.selected-text {
-  color: var(--accent-blue);
-  font-weight: 500;
-}
-
-.form-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-.form-actions .btn {
-  flex: 1;
-}
-
-/* 批次上傳提示 */
-.batch-upload-notice {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-color);
-  padding: 16px;
-  border-radius: var(--border-radius-md);
-  margin-bottom: 24px;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.file-list {
-  margin: 12px 0 0;
-  padding-left: 20px;
-  max-height: 150px;
-  overflow-y: auto;
-  color: var(--text-secondary);
 }
 
 /* 全局進度與狀態摘要 */
@@ -453,10 +493,10 @@ async function onSubmit() {
   transition: width 0.3s ease;
 }
 .summary-status-alert {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .alert-box {
-  padding: 12px;
+  padding: 10px;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -473,42 +513,138 @@ async function onSubmit() {
   color: #e57373;
 }
 
-/* 逐個影片佇列與個別進度 */
+/* 佇列管理區域 */
 .upload-queue-container {
   margin-bottom: 24px;
 }
-.upload-queue-container h3 {
-  font-size: 14px;
+.queue-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
-  color: var(--text-secondary);
 }
+.queue-header-row h3 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.queue-bulk-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon-cancel {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: var(--transition-smooth);
+}
+.btn-icon-cancel:hover {
+  color: #e57373;
+  background: rgba(229, 115, 115, 0.1);
+}
+
+.btn.danger-sm {
+  background: #c62828;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn.danger-sm:hover {
+  background: #b71c1c;
+}
+
+.btn.secondary-sm {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn.secondary-sm:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
 .queue-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 300px;
+  gap: 10px;
+  max-height: 350px;
   overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 12px;
   background: rgba(0, 0, 0, 0.15);
 }
+
+.queue-select-all-row {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 .queue-item {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-bottom: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 .queue-item:last-child {
   padding-bottom: 0;
   border-bottom: none;
 }
+
+.queue-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.item-checkbox {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+.checkbox-placeholder {
+  width: 14px;
+  height: 14px;
+}
+
+.queue-item-info {
+  flex: 1;
+  overflow: hidden;
+}
+
 .queue-item-header {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
   gap: 12px;
+  margin-bottom: 4px;
 }
 .queue-item-name {
   color: var(--text-primary);
@@ -534,6 +670,10 @@ async function onSubmit() {
 .queue-item-status.error {
   color: #e57373;
 }
+.queue-item-status.cancelled {
+  color: var(--text-muted);
+}
+
 .queue-item-bar-container {
   width: 100%;
 }
@@ -556,10 +696,23 @@ async function onSubmit() {
 .queue-item-bar .fill.error {
   background: #c62828;
 }
+.queue-item-bar .fill.cancelled {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .queue-item-error {
   font-size: 11px;
   color: #e57373;
   margin: 2px 0 0 0;
   word-break: break-all;
+}
+
+.form-actions-bottom {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.form-actions-bottom .btn {
+  flex: 1;
 }
 </style>

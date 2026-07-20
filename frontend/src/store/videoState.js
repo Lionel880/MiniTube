@@ -9,7 +9,8 @@ export const useVideoStateStore = defineStore("videoState", {
     currentFolderName: "",
     sortBy: localStorage.getItem("minitube_sort_by") || "createdAt",
     sortDir: localStorage.getItem("minitube_sort_dir") || "desc",
-    viewMode: localStorage.getItem("minitube_view_mode") || "grid"
+    viewMode: localStorage.getItem("minitube_view_mode") || "grid",
+    scrollY: 0,
   }),
   actions: {
     resetState() {
@@ -21,6 +22,7 @@ export const useVideoStateStore = defineStore("videoState", {
       this.sortBy = "createdAt";
       this.sortDir = "desc";
       this.viewMode = "grid";
+      this.scrollY = 0;
     }
   }
 });

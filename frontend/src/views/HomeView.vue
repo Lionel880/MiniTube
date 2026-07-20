@@ -116,7 +116,7 @@ async function deleteFolder(folder) {
   }
 }
 
-async function navigateToFolder(folderId) {
+async function navigateToFolder(folderId, resetPage = true) {
   if (folderId === null || folderId === "null" || folderId === "") {
     currentFolderId.value = null;
     currentFolderName.value = "";
@@ -144,7 +144,7 @@ async function navigateToFolder(folderId) {
     }
   }
   await loadFolders();
-  load(0);
+  load(resetPage ? 0 : page.value);
 }
 
 const allFolders = ref([]);
@@ -173,11 +173,11 @@ function getFolderFullPath(folder) {
 }
 
 function enterFolder(folder) {
-  navigateToFolder(folder.id);
+  navigateToFolder(folder.id, true);
 }
 
 function exitFolder() {
-  navigateToFolder(currentParentFolderId.value);
+  navigateToFolder(currentParentFolderId.value, true);
 }
 
 async function batchMoveToFolder(folderId) {
@@ -229,6 +229,7 @@ function goToVideo(video) {
   if (selectMode.value) {
     handleSelect(video.id, !selectedIds.value.includes(video.id));
   } else {
+    videoStateStore.scrollY = window.scrollY || window.pageYOffset || 0;
     router.push({ name: "video-detail", params: { id: video.id } });
   }
 }
@@ -241,7 +242,7 @@ function formatSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-async function load(p = 0, silent = false) {
+async function load(p = page.value, silent = false) {
   if (!silent) {
     loading.value = true;
     errorMessage.value = "";
@@ -275,6 +276,12 @@ async function load(p = 0, silent = false) {
     totalPages.value = data.totalPages || 0;
     if (!silent) {
       selectedIds.value = [];
+    }
+
+    if (!silent && videoStateStore.scrollY > 0) {
+      setTimeout(() => {
+        window.scrollTo({ top: videoStateStore.scrollY, behavior: "instant" });
+      }, 50);
     }
   } catch (err) {
     if (!silent) {
@@ -450,7 +457,7 @@ watch(
   () => authStore.isLoggedIn,
   (loggedIn) => {
     if (loggedIn) {
-      navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"));
+      navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"), false);
     } else {
       videos.value = [];
       folders.value = [];
@@ -465,7 +472,7 @@ watch(
 onMounted(() => {
   window.addEventListener("click", handleOutsideClick);
   if (authStore.isLoggedIn) {
-    navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"));
+    navigateToFolder(sessionStorage.getItem("minitube_active_folder_id"), false);
   }
 });
 

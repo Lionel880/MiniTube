@@ -90,6 +90,79 @@ public class VideoService {
         return toDetailResponse(saved, username);
     }
 
+    @Transactional
+    public VideoDetailResponse uploadChunk(String username, String uploadId, int chunkIndex, int totalChunks,
+                                           String title, String description, Long folderId, Long videoId, MultipartFile file) {
+        User uploader = getUserOrThrow(username);
+        
+        fileStorageService.storeChunk(uploadId, chunkIndex, file);
+
+        Video video;
+        if (videoId == null) {
+            Folder folder = null;
+            if (folderId != null) {
+                folder = folderRepository.findById(folderId)
+                        .orElseThrow(() -> new BusinessException("找不到該資料夾"));
+                if (!folder.getOwner().getUsername().equalsIgnoreCase(username)) {
+                    throw new BusinessException("您沒有權限將影片放入該資料夾");
+                }
+            }
+
+            String finalTitle = title.trim();
+            if (finalTitle.length() > 190) {
+                finalTitle = finalTitle.substring(0, 190);
+            }
+
+            video = Video.builder()
+                    .title(finalTitle)
+                    .description(description == null ? "" : description.trim())
+                    .filePath("temp_placeholder/" + uploadId)
+                    .fileSize(0L)
+                    .status(VideoStatus.UPLOADING)
+                    .viewCount(0L)
+                    .uploader(uploader)
+                    .folder(folder)
+                    .build();
+
+            video = videoRepository.save(video);
+        } else {
+            video = videoRepository.findById(videoId)
+                    .orElseThrow(() -> new BusinessException("找不到影片資訊"));
+            if (!video.getUploader().getUsername().equalsIgnoreCase(username)) {
+                throw new BusinessException("您沒有權限修改此影片");
+            }
+        }
+
+        if (fileStorageService.isAllChunksUploaded(uploadId, totalChunks)) {
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename != null && originalFilename.equals("blob") && title.contains(".")) {
+                originalFilename = title;
+            } else if (originalFilename == null || originalFilename.equals("blob")) {
+                originalFilename = title + ".mp4";
+            }
+            String folderName = video.getFolder() != null ? video.getFolder().getName() : null;
+            
+            triggerMergeAndTranscodingAsync(video.getId(), uploadId, totalChunks, folderName, originalFilename);
+        }
+
+        return toDetailResponse(video, username);
+    }
+
+    private void triggerMergeAndTranscodingAsync(Long videoId, String uploadId, int totalChunks, String folderName, String originalFilename) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        transcodingService.mergeAndTranscode(videoId, uploadId, totalChunks, folderName, originalFilename);
+                    }
+                }
+            );
+        } else {
+            transcodingService.mergeAndTranscode(videoId, uploadId, totalChunks, folderName, originalFilename);
+        }
+    }
+
     private void triggerTranscodingAsync(Long videoId, String storedFilename) {
         if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
