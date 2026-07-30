@@ -641,8 +641,8 @@ function formatDate(value) {
 
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-      <!-- ===== 資料夾切換過場動畫包裹區塊 ===== -->
-      <Transition :name="navDirection === 'forward' ? 'folder-slide-forward' : 'folder-slide-backward'" mode="out-in">
+      <!-- ===== 資料夾切換過場動畫包裹區塊 (僅登入後顯示影片與資料夾內容) ===== -->
+      <Transition v-if="authStore.isLoggedIn" :name="navDirection === 'forward' ? 'folder-slide-forward' : 'folder-slide-backward'" mode="out-in">
         <div :key="currentFolderId || 'root'" class="folder-view-animated-container">
           <!-- ===== 列表視圖 ===== -->
           <template v-if="viewMode === 'list'">

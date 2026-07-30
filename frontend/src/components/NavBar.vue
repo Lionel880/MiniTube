@@ -207,10 +207,6 @@ function clearApiUrl() {
           </Transition>
         </div>
       </template>
-      <template v-else>
-        <RouterLink class="btn" :to="{ name: 'login' }">登入</RouterLink>
-        <RouterLink class="btn primary" :to="{ name: 'register' }">註冊</RouterLink>
-      </template>
     </div>
   </header>
 
