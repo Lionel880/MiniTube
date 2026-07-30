@@ -326,15 +326,28 @@ public class FileStorageService {
     }
 
     /**
-     * 從磁碟中安全刪除已儲存的影片檔案。
+     * 從磁碟中安全刪除已儲存的影片檔案或封面圖片檔案。
      */
     public void delete(String storedFilename) {
+        if (storedFilename == null || storedFilename.isBlank()) {
+            return;
+        }
         try {
-            Path filePath = this.uploadDir.resolve(storedFilename).normalize();
+            String cleanPathStr = storedFilename.startsWith("/") || storedFilename.startsWith("\\")
+                    ? storedFilename.substring(1) : storedFilename;
+            Path filePath = this.uploadDir.resolve(cleanPathStr).normalize();
             if (filePath.startsWith(this.uploadDir)) {
-                Files.deleteIfExists(filePath);
+                System.gc();
+                int maxRetries = 5;
+                for (int i = 0; i < maxRetries; i++) {
+                    if (Files.deleteIfExists(filePath)) {
+                        break;
+                    }
+                    Thread.sleep(100);
+                    System.gc();
+                }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             // 刪除實體檔案失敗時僅記錄，不應完全中斷資料庫刪除流程
         }
     }

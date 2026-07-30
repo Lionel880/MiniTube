@@ -305,6 +305,16 @@ public class VideoService {
     }
 
     @Transactional
+    public void delete(Long id, String username) {
+        User user = getUserOrThrow(username);
+        Video video = getVideoOrThrow(id);
+        if (!video.getUploader().getId().equals(user.getId())) {
+            throw new BusinessException("您無權刪除其他人上傳的影片");
+        }
+        deleteVideoFilesAndEntity(video);
+    }
+
+    @Transactional
     public void batchDelete(List<Long> ids, String username) {
         User user = getUserOrThrow(username);
         List<Video> videos = videoRepository.findAllById(ids);
@@ -313,12 +323,7 @@ public class VideoService {
             if (!video.getUploader().getId().equals(user.getId())) {
                 throw new BusinessException("您無權刪除其他人上傳的影片");
             }
-            fileStorageService.delete(video.getFilePath());
-            // 安全清理本機的實體封面圖片檔
-            if (video.getCoverUrl() != null && !video.getCoverUrl().isBlank()) {
-                fileStorageService.delete(video.getCoverUrl());
-            }
-            videoRepository.delete(video);
+            deleteVideoFilesAndEntity(video);
         }
     }
 
@@ -327,12 +332,20 @@ public class VideoService {
         User user = getUserOrThrow(username);
         List<Video> videos = videoRepository.findByUploader(user);
         for (Video video : videos) {
-            fileStorageService.delete(video.getFilePath());
-            if (video.getCoverUrl() != null && !video.getCoverUrl().isBlank()) {
-                fileStorageService.delete(video.getCoverUrl());
-            }
+            deleteVideoFilesAndEntity(video);
         }
-        videoRepository.deleteAll(videos);
+    }
+
+    private void deleteVideoFilesAndEntity(Video video) {
+        // 清理實體影片檔案
+        if (video.getFilePath() != null && !video.getFilePath().isBlank()) {
+            fileStorageService.delete(video.getFilePath());
+        }
+        // 清理實體封面圖片檔案 (covers/xxx.jpg)
+        if (video.getCoverUrl() != null && !video.getCoverUrl().isBlank()) {
+            fileStorageService.delete(video.getCoverUrl());
+        }
+        videoRepository.delete(video);
     }
 
     @Transactional(readOnly = true)

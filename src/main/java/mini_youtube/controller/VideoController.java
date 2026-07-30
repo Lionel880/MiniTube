@@ -128,6 +128,14 @@ public class VideoController {
         return videoService.getById(id, currentUsername(authentication));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+        videoService.delete(id, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/batch")
     public ResponseEntity<Void> batchDelete(
             @RequestBody List<Long> ids,
