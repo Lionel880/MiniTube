@@ -289,7 +289,7 @@ public class TranscodingService {
         }
     }
 
-    private boolean runTranscodeCommand(Path sourcePath, Path targetPath, Long videoId, long durationMs) {
+    private boolean runTranscodeCommand(Path sourcePath, Path targetPath, Long videoId, long initialDurationMs) {
         try {
             ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator locator = new ws.schild.jave.process.ffmpeg.DefaultFFMPEGLocator();
             String ffmpegPath = locator.getExecutablePath();
@@ -310,14 +310,27 @@ public class TranscodingService {
             );
             
             Process process = pb.start();
+            final long[] durationHolder = new long[]{ initialDurationMs };
             
-            // Consume stderr in a separate thread to prevent pipe blockage
+            // Consume stderr in a separate thread and dynamically parse Duration if initialDurationMs <= 0
             new Thread(() -> {
                 try (java.io.BufferedReader errReader = new java.io.BufferedReader(
                         new java.io.InputStreamReader(process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                     String errLine;
                     while ((errLine = errReader.readLine()) != null) {
-                        // Consuming silently, or could log at trace/debug if needed
+                        if (durationHolder[0] <= 0 && errLine.contains("Duration:")) {
+                            try {
+                                int dIdx = errLine.indexOf("Duration:");
+                                String durationStr = errLine.substring(dIdx + 9).split(",")[0].trim();
+                                long parsedMs = parseTimeStrToMs(durationStr);
+                                if (parsedMs > 0) {
+                                    durationHolder[0] = parsedMs;
+                                    log.info("從 FFmpeg 資訊解析出影片長度: {} ms (ID: {})", parsedMs, videoId);
+                                }
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     // ignore
@@ -330,21 +343,35 @@ public class TranscodingService {
                     new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    long currentMs = -1;
                     if (line.contains("out_time_us=")) {
                         try {
                             int index = line.indexOf("out_time_us=");
-                            long currentUs = Long.parseLong(line.substring(index + 12).trim());
-                            long currentMs = currentUs / 1000;
-                            if (durationMs > 0 && currentMs > 0) {
-                                int progress = (int) ((currentMs * 100) / durationMs);
-                                progress = Math.min(progress, 99);
-                                if (progress > lastProgress) {
-                                    lastProgress = progress;
-                                    updateTranscodeProgress(videoId, progress);
-                                }
+                            String valStr = line.substring(index + 12).trim();
+                            if (!valStr.equalsIgnoreCase("N/A")) {
+                                currentMs = Long.parseLong(valStr) / 1000;
                             }
                         } catch (Exception e) {
-                            // 忽略
+                            // ignore
+                        }
+                    }
+                    if (currentMs < 0 && line.contains("out_time=")) {
+                        try {
+                            int index = line.indexOf("out_time=");
+                            String timeStr = line.substring(index + 9).trim();
+                            currentMs = parseTimeStrToMs(timeStr);
+                        } catch (Exception e) {
+                            // ignore
+                        }
+                    }
+
+                    long totalDur = durationHolder[0];
+                    if (totalDur > 0 && currentMs > 0) {
+                        int progress = (int) ((currentMs * 100) / totalDur);
+                        progress = Math.min(Math.max(progress, 1), 99);
+                        if (progress > lastProgress) {
+                            lastProgress = progress;
+                            updateTranscodeProgress(videoId, progress);
                         }
                     }
                 }
