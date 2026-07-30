@@ -98,6 +98,10 @@ async function handleUpdate() {
 }
 
 onMounted(() => {
+  if (!authStore.isLoggedIn) {
+    router.push({ name: "login" });
+    return;
+  }
   loadProfile();
 });
 </script>

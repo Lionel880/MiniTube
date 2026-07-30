@@ -72,6 +72,12 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      setMemoryToken("");
+      localStorage.removeItem("minitube_token");
+      localStorage.removeItem("username");
+    }
+
     let message =
       error.response?.data?.message ||
       error.message ||

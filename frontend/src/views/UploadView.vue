@@ -6,7 +6,15 @@ import { useUploadStore } from "../store/upload";
 const router = useRouter();
 const uploadStore = useUploadStore();
 
+import { useAuthStore } from "../store/auth";
+
+const authStore = useAuthStore();
+
 onMounted(() => {
+  if (!authStore.isLoggedIn) {
+    router.push({ name: "login" });
+    return;
+  }
   // 不要在重新整理時隨意清空正在上傳的佇列
   if (!uploadStore.isUploading) {
     uploadStore.queue = [];

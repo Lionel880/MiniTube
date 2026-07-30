@@ -540,7 +540,7 @@ function formatDate(value) {
       </div>
 
       <!-- ===== 麵包屑 / 導航列 ===== -->
-      <div class="nav-bar">
+      <div v-if="authStore.isLoggedIn" class="nav-bar">
         <div class="nav-bar-left">
           <button v-if="currentFolderId !== null" class="nav-back-btn" @click="exitFolder" title="返回上一層">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -838,8 +838,8 @@ function formatDate(value) {
     </div>
   </Transition>
 
-      <!-- 分頁與每頁數量選擇 -->
-      <div class="pagination-container">
+      <!-- 分頁與每頁數量選擇 (僅登入後顯示) -->
+      <div v-if="authStore.isLoggedIn" class="pagination-container">
         <!-- 分頁控制（只有總頁數大於 1 時才顯示） -->
         <div class="pagination-controls" v-if="totalPages > 1">
           <button class="btn" type="button" :disabled="page === 0" @click="prevPage">上一頁</button>
@@ -847,7 +847,7 @@ function formatDate(value) {
           <button class="btn" type="button" :disabled="page + 1 >= totalPages" @click="nextPage">下一頁</button>
         </div>
 
-        <!-- 每頁數量選擇，永遠顯示 -->
+        <!-- 每頁數量選擇 -->
         <div class="page-size-selector">
           <span class="select-label">每頁顯示：</span>
           <select v-model="size" class="nav-select bottom-select">
@@ -855,6 +855,19 @@ function formatDate(value) {
             <option :value="50">50 筆</option>
             <option :value="100">100 筆</option>
           </select>
+        </div>
+      </div>
+
+      <!-- ===== 訪客引導區塊 (未登入時顯示) ===== -->
+      <div v-if="!authStore.isLoggedIn" class="guest-hero-container">
+        <div class="guest-hero-card glass-card">
+          <div class="guest-icon">🎬</div>
+          <h2>歡迎使用 MiniTube 影音雲</h2>
+          <p>請先登入帳號以存取您的個人影音庫與資料夾</p>
+          <div class="guest-actions">
+            <RouterLink class="btn primary guest-btn" :to="{ name: 'login' }">🔑 登入帳號</RouterLink>
+            <RouterLink class="btn secondary guest-btn" :to="{ name: 'register' }">📝 快速註冊</RouterLink>
+          </div>
         </div>
       </div>
 
@@ -1678,5 +1691,61 @@ function formatDate(value) {
 .folder-card:active,
 .video-card:active {
   transform: scale(0.96) !important;
+}
+
+/* 🎬 未登入訪客引導視圖 (Guest Hero Card) */
+.guest-hero-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 16px;
+}
+
+.guest-hero-card {
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  padding: 40px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+}
+
+.guest-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.guest-hero-card h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.guest-hero-card p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.guest-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.guest-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
