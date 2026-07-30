@@ -130,8 +130,8 @@ function clearApiUrl() {
       <RouterLink class="brand" :to="{ name: 'home' }">Mini<span>Tube</span></RouterLink>
     </div>
 
-    <!-- 搜尋框 (登入後且非首頁、影片詳細頁與上傳頁時顯示) -->
-    <form v-if="authStore.isLoggedIn && route.name !== 'home' && route.name !== 'video-detail' && route.name !== 'upload'" @submit.prevent="onSearch">
+    <!-- 搜尋框 (登入後且非首頁、影片詳細頁、上傳頁與個人資料頁時顯示) -->
+    <form v-if="authStore.isLoggedIn && route.name !== 'home' && route.name !== 'video-detail' && route.name !== 'upload' && !route.path.startsWith('/profile')" @submit.prevent="onSearch">
       <input v-model="keyword" type="text" placeholder="搜尋影片" />
       <button class="search-btn" type="submit">搜尋</button>
     </form>
