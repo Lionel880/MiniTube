@@ -109,31 +109,6 @@ onMounted(() => {
 <template>
   <div class="page">
     <div class="center-page glass-card">
-      <!-- 頂部頁籤選單 (Sub-Page Segmented Tabs) -->
-      <div class="profile-tabs-nav">
-        <RouterLink
-          class="profile-tab-btn"
-          :class="{ active: activeTab === 'account' }"
-          :to="{ name: 'profile-account' }"
-        >
-          ⚙️ 帳號與密碼
-        </RouterLink>
-        <RouterLink
-          class="profile-tab-btn"
-          :class="{ active: activeTab === 'theme' }"
-          :to="{ name: 'profile-theme' }"
-        >
-          🎨 外觀主題
-        </RouterLink>
-        <RouterLink
-          class="profile-tab-btn"
-          :class="{ active: activeTab === 'app' }"
-          :to="{ name: 'profile-app' }"
-        >
-          📱 App 與描述檔
-        </RouterLink>
-      </div>
-
       <!-- ===== 子頁面 1：帳號與密碼設定 ===== -->
       <template v-if="activeTab === 'account'">
         <h2>⚙️ 帳號與密碼設定</h2>
@@ -236,14 +211,6 @@ onMounted(() => {
           </details>
         </div>
       </template>
-
-      <hr class="divider" />
-
-      <div class="logout-container">
-        <button class="btn danger logout-btn" type="button" @click="handleLogout">
-          🚪 登出帳號
-        </button>
-      </div>
     </div>
   </div>
 </template>
