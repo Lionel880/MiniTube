@@ -404,7 +404,8 @@ async function clearCurrentDirectoryVideos() {
       size: 9999
     });
 
-    const idsToDelete = res.content.map(v => v.id);
+    const videosList = res.videos || [];
+    const idsToDelete = videosList.map(v => v.id);
     if (idsToDelete.length === 0) {
       alert("當前目錄下沒有任何影片可供刪除。");
       loading.value = false;
