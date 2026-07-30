@@ -22,6 +22,19 @@
   --border-radius-lg: 8px;
 }
 
+/* ☀️ 一般 (淺色) 模式色彩主題變數 */
+[data-theme="light"] {
+  --bg-primary: #f4f5f8;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --border-color: #e1e3ea;
+  --border-hover: #ff7a00;
+  --text-primary: #121215;
+  --text-secondary: #525266;
+  --text-muted: #888899;
+  --shadow-premium: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

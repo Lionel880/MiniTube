@@ -18,6 +18,14 @@ import { useRouter } from "vue-router";
 const authStore = useAuthStore();
 const router = useRouter();
 
+const currentTheme = ref(localStorage.getItem("minitube_theme") || "dark");
+
+function setTheme(theme) {
+  currentTheme.value = theme;
+  localStorage.setItem("minitube_theme", theme);
+  document.documentElement.setAttribute("data-theme", theme);
+}
+
 function handleLogout() {
   if (confirm("確定要登出系統嗎？")) {
     authStore.logout();
@@ -131,6 +139,30 @@ onMounted(() => {
         <button class="btn primary submit-btn" type="submit" :disabled="loading">
           {{ loading ? "儲存中..." : "儲存變更" }}
         </button>
+
+        <hr class="divider" />
+        <h4 class="section-subtitle">🎨 外觀主題切換</h4>
+        <div class="theme-switch-card">
+          <p class="theme-desc">選擇深色（黑暗）或淺色（一般）畫面色彩風格：</p>
+          <div class="theme-options">
+            <button
+              type="button"
+              class="theme-option-btn"
+              :class="{ active: currentTheme === 'dark' }"
+              @click="setTheme('dark')"
+            >
+              🌙 黑暗模式
+            </button>
+            <button
+              type="button"
+              class="theme-option-btn"
+              :class="{ active: currentTheme === 'light' }"
+              @click="setTheme('light')"
+            >
+              ☀️ 一般模式
+            </button>
+          </div>
+        </div>
 
         <hr class="divider" />
         <h4 class="section-subtitle">📱 手機 App 安裝與描述檔</h4>
@@ -283,5 +315,52 @@ onMounted(() => {
 .guide-content ol {
   padding-left: 18px;
   margin: 0;
+}
+
+.theme-switch-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 10px;
+}
+
+.theme-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.theme-options {
+  display: flex;
+  gap: 10px;
+}
+
+.theme-option-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-option-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.theme-option-btn.active {
+  background: rgba(255, 122, 0, 0.15);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
 }
 </style>

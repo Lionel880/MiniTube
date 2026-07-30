@@ -20,8 +20,11 @@ function scrollToTop() {
   });
 }
 
-// 頁面重新整理 (F5) 時，嘗試恢復登入狀態
+// 頁面重新整理 (F5) 時，嘗試恢復登入狀態與主題風格
 onMounted(() => {
+  const savedTheme = localStorage.getItem("minitube_theme") || "dark";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+
   authStore.restoreSession();
 
   window.addEventListener("scroll", handleScroll);
