@@ -172,12 +172,21 @@ function getFolderFullPath(folder) {
   return folder.breadcrumbs.map(c => c.name).join(" › ");
 }
 
+const navDirection = ref("forward");
+
 function enterFolder(folder) {
+  navDirection.value = "forward";
   navigateToFolder(folder.id, true);
 }
 
 function exitFolder() {
+  navDirection.value = "backward";
   navigateToFolder(currentParentFolderId.value, true);
+}
+
+function goToCrumb(folderId) {
+  navDirection.value = "backward";
+  navigateToFolder(folderId, true);
 }
 
 async function batchMoveToFolder(folderId) {
@@ -543,7 +552,7 @@ function formatDate(value) {
             <span
               v-if="currentFolderId !== null"
               class="crumb-link"
-              @click="navigateToFolder(null)"
+              @click="goToCrumb(null)"
             >全部影片</span>
             
             <template v-for="crumb in currentFolderBreadcrumbs" :key="crumb.id">
@@ -551,7 +560,7 @@ function formatDate(value) {
               <span
                 v-if="crumb.id !== currentFolderId"
                 class="crumb-link"
-                @click="navigateToFolder(crumb.id)"
+                @click="goToCrumb(crumb.id)"
               >{{ crumb.name }}</span>
               <span v-else class="crumb-current">{{ crumb.name }}</span>
             </template>
@@ -632,8 +641,11 @@ function formatDate(value) {
 
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-      <!-- ===== 列表視圖 ===== -->
-      <template v-if="viewMode === 'list'">
+      <!-- ===== 資料夾切換過場動畫包裹區塊 ===== -->
+      <Transition :name="navDirection === 'forward' ? 'folder-slide-forward' : 'folder-slide-backward'" mode="out-in">
+        <div :key="currentFolderId || 'root'" class="folder-view-animated-container">
+          <!-- ===== 列表視圖 ===== -->
+          <template v-if="viewMode === 'list'">
         <!-- 欄位標題列 -->
         <div class="list-header" :class="{ 'with-check': selectMode }">
           <div class="col-check" v-if="selectMode">
@@ -823,6 +835,8 @@ function formatDate(value) {
           </div>
         </template>
       </template>
+    </div>
+  </Transition>
 
       <!-- 分頁與每頁數量選擇 -->
       <div class="pagination-container">
@@ -1628,4 +1642,41 @@ function formatDate(value) {
   }
 }
 
+/* 📁 資料夾切換原生流暢過場動畫 */
+.folder-slide-forward-enter-active,
+.folder-slide-forward-leave-active,
+.folder-slide-backward-enter-active,
+.folder-slide-backward-leave-active {
+  transition: opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1), transform 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* 前進進入子資料夾 (由右向左切入) */
+.folder-slide-forward-enter-from {
+  opacity: 0;
+  transform: translateX(24px) scale(0.99);
+}
+.folder-slide-forward-leave-to {
+  opacity: 0;
+  transform: translateX(-24px) scale(0.99);
+}
+
+/* 後退返回上一層資料夾 (由左向右切回) */
+.folder-slide-backward-enter-from {
+  opacity: 0;
+  transform: translateX(-24px) scale(0.99);
+}
+.folder-slide-backward-leave-to {
+  opacity: 0;
+  transform: translateX(24px) scale(0.99);
+}
+
+.folder-card,
+.video-card {
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.folder-card:active,
+.video-card:active {
+  transform: scale(0.96) !important;
+}
 </style>

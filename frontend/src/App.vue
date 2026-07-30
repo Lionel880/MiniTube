@@ -43,7 +43,11 @@ onUnmounted(() => {
 <template>
   <NavBar />
   <main>
-    <RouterView />
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page-slide" mode="out-in">
+        <component :is="Component" :key="route.fullPath" />
+      </Transition>
+    </RouterView>
   </main>
 
   <!-- 返回頂部按鈕 -->
@@ -86,5 +90,21 @@ onUnmounted(() => {
 }
 .scroll-top-btn:active {
   transform: translateY(0);
+}
+
+/* 📱 Native iOS 風格全站頁面切換過場動畫 */
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.page-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.995);
+}
+
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.995);
 }
 </style>
