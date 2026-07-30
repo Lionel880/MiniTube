@@ -1613,13 +1613,15 @@ function formatDate(value) {
   }
 
   .folders-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+    gap: 10px;
   }
 
   .pagination-container {
     flex-direction: column;
-    gap: 16px;
-    margin-top: 24px;
+    gap: 12px;
+    margin-top: 20px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   }
 
   .status-badge {
