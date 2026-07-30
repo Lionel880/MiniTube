@@ -36,10 +36,12 @@ function handleGlobalClick(e) {
 
 onMounted(() => {
   window.addEventListener("click", handleGlobalClick);
+  window.addEventListener("touchstart", handleGlobalClick, { passive: true });
 });
 
 onUnmounted(() => {
   window.removeEventListener("click", handleGlobalClick);
+  window.removeEventListener("touchstart", handleGlobalClick);
 });
 
 function onSearch() {
@@ -159,6 +161,14 @@ function clearApiUrl() {
             👤 個人資料 <span class="caret-icon">{{ isProfileMenuOpen ? '▲' : '▼' }}</span>
           </button>
 
+          <!-- 透明遮罩層（用於手機端與電腦端點擊外部快速收合懸浮選單） -->
+          <div
+            v-if="isProfileMenuOpen"
+            class="popover-backdrop"
+            @click="isProfileMenuOpen = false"
+            @touchstart.passive="isProfileMenuOpen = false"
+          ></div>
+
           <!-- 懸浮選單卡片 (Floating Popover Menu) -->
           <Transition name="popover-slide">
             <div v-if="isProfileMenuOpen" class="profile-popover glass-card">
@@ -166,7 +176,6 @@ function clearApiUrl() {
                 <span class="user-avatar-badge">👤</span>
                 <div class="user-meta">
                   <span class="user-name">{{ authStore.username || '用戶' }}</span>
-                  <span class="user-status-online">● 線上</span>
                 </div>
               </div>
               <hr class="popover-hr" />
@@ -526,6 +535,16 @@ function clearApiUrl() {
 .profile-menu-container {
   position: relative;
   display: inline-block;
+}
+
+.popover-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9998;
+  background: transparent;
 }
 
 .caret-icon {
