@@ -18,6 +18,30 @@ const isTesting = ref(false);
 const testStatus = ref(""); // "success", "error", ""
 const testMessage = ref("");
 
+import { onMounted, onUnmounted } from "vue";
+
+const isProfileMenuOpen = ref(false);
+const profileMenuRef = ref(null);
+
+function toggleProfileMenu(e) {
+  if (e) e.stopPropagation();
+  isProfileMenuOpen.value = !isProfileMenuOpen.value;
+}
+
+function handleGlobalClick(e) {
+  if (isProfileMenuOpen.value && profileMenuRef.value && !profileMenuRef.value.contains(e.target)) {
+    isProfileMenuOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("click", handleGlobalClick);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("click", handleGlobalClick);
+});
+
 function onSearch() {
   const q = keyword.value.trim();
   if (!q) return;
@@ -123,9 +147,65 @@ function clearApiUrl() {
         >
           {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : '上傳影片' }}
         </RouterLink>
-        <RouterLink class="btn secondary profile-nav-btn" :to="{ name: 'profile' }" title="查看與編輯個人資料">
-          👤 個人資料
-        </RouterLink>
+        <!-- 👤 個人資料懸浮選單容器 (Floating Profile Popover Container) -->
+        <div class="profile-menu-container" ref="profileMenuRef">
+          <button
+            class="btn secondary profile-nav-btn"
+            :class="{ active: isProfileMenuOpen || route.path.startsWith('/profile') }"
+            type="button"
+            @click="toggleProfileMenu"
+            title="開啟個人資料懸浮選單"
+          >
+            👤 個人資料 <span class="caret-icon">{{ isProfileMenuOpen ? '▲' : '▼' }}</span>
+          </button>
+
+          <!-- 懸浮選單卡片 (Floating Popover Menu) -->
+          <Transition name="popover-slide">
+            <div v-if="isProfileMenuOpen" class="profile-popover glass-card">
+              <div class="popover-header">
+                <span class="user-avatar-badge">👤</span>
+                <div class="user-meta">
+                  <span class="user-name">{{ authStore.username || '用戶' }}</span>
+                  <span class="user-status-online">● 線上</span>
+                </div>
+              </div>
+              <hr class="popover-hr" />
+              <RouterLink
+                class="popover-link-item"
+                :to="{ name: 'profile-account' }"
+                @click="isProfileMenuOpen = false"
+              >
+                <span class="link-icon">⚙️</span>
+                <span class="link-label">帳號與密碼設定</span>
+              </RouterLink>
+              <RouterLink
+                class="popover-link-item"
+                :to="{ name: 'profile-theme' }"
+                @click="isProfileMenuOpen = false"
+              >
+                <span class="link-icon">🎨</span>
+                <span class="link-label">外觀主題設定</span>
+              </RouterLink>
+              <RouterLink
+                class="popover-link-item"
+                :to="{ name: 'profile-app' }"
+                @click="isProfileMenuOpen = false"
+              >
+                <span class="link-icon">📱</span>
+                <span class="link-label">手機 App 安裝與描述檔</span>
+              </RouterLink>
+              <hr class="popover-hr" />
+              <button
+                class="popover-link-item danger-item"
+                type="button"
+                @click="() => { isProfileMenuOpen = false; onLogout(); }"
+              >
+                <span class="link-icon">🚪</span>
+                <span class="link-label">登出帳號</span>
+              </button>
+            </div>
+          </Transition>
+        </div>
       </template>
       <template v-else>
         <RouterLink class="btn" :to="{ name: 'login' }">登入</RouterLink>
@@ -444,5 +524,124 @@ function clearApiUrl() {
   border: none;
   border-top: 1px solid var(--border-color);
   margin: 16px 0;
+}
+
+/* 👤 個人資料懸浮選單 (Floating Profile Popover Menu) */
+.profile-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+.caret-icon {
+  font-size: 9px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.profile-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 250px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  padding: 12px;
+  z-index: 9999;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 10px;
+}
+
+.user-avatar-badge {
+  font-size: 20px;
+  background: rgba(255, 122, 0, 0.15);
+  color: var(--accent-blue);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 122, 0, 0.3);
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.user-status-online {
+  font-size: 11px;
+  color: var(--success-color);
+  margin-top: 2px;
+}
+
+.popover-hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 6px 0;
+}
+
+.popover-link-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.popover-link-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--accent-blue);
+  transform: translateX(2px);
+}
+
+.popover-link-item .link-icon {
+  font-size: 16px;
+}
+
+.popover-link-item.danger-item {
+  color: var(--danger-color);
+}
+
+.popover-link-item.danger-item:hover {
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--danger-color);
+}
+
+/* 懸浮選單進入/離開動畫 */
+.popover-slide-enter-active,
+.popover-slide-leave-active {
+  transition: opacity 0.18s cubic-bezier(0.25, 1, 0.5, 1), transform 0.18s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.popover-slide-enter-from,
+.popover-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
 }
 </style>

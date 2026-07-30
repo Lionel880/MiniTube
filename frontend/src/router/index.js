@@ -25,9 +25,34 @@ const routes = [
   },
   {
     path: "/profile",
-    name: "profile",
-    component: () => import("../views/ProfileView.vue"),
+    redirect: "/profile/account",
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/account",
+    name: "profile-account",
+    component: () => import("../views/ProfileView.vue"),
+    props: { activeTab: "account" },
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/theme",
+    name: "profile-theme",
+    component: () => import("../views/ProfileView.vue"),
+    props: { activeTab: "theme" },
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/app",
+    name: "profile-app",
+    component: () => import("../views/ProfileView.vue"),
+    props: { activeTab: "app" },
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/legacy",
+    name: "profile",
+    redirect: "/profile/account",
   },
   {
     path: "/videos/:id",

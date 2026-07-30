@@ -2,6 +2,13 @@
 import { onMounted, ref } from "vue";
 import http from "../api/http";
 
+const props = defineProps({
+  activeTab: {
+    type: String,
+    default: "account",
+  },
+});
+
 const username = ref("");
 const email = ref("");
 const oldPassword = ref("");
@@ -98,51 +105,81 @@ onMounted(() => {
 <template>
   <div class="page">
     <div class="center-page glass-card">
-      <h2>個人資料設定</h2>
-
-      <div v-if="loading && !username" class="loading-placeholder">
-        載入中...
+      <!-- 頂部頁籤選單 (Sub-Page Segmented Tabs) -->
+      <div class="profile-tabs-nav">
+        <RouterLink
+          class="profile-tab-btn"
+          :class="{ active: activeTab === 'account' }"
+          :to="{ name: 'profile-account' }"
+        >
+          ⚙️ 帳號與密碼
+        </RouterLink>
+        <RouterLink
+          class="profile-tab-btn"
+          :class="{ active: activeTab === 'theme' }"
+          :to="{ name: 'profile-theme' }"
+        >
+          🎨 外觀主題
+        </RouterLink>
+        <RouterLink
+          class="profile-tab-btn"
+          :class="{ active: activeTab === 'app' }"
+          :to="{ name: 'profile-app' }"
+        >
+          📱 App 與描述檔
+        </RouterLink>
       </div>
 
-      <form v-else @submit.prevent="handleUpdate">
-        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
+      <!-- ===== 子頁面 1：帳號與密碼設定 ===== -->
+      <template v-if="activeTab === 'account'">
+        <h2>⚙️ 帳號與密碼設定</h2>
 
-        <div class="field">
-          <label>使用者名稱 (帳號)</label>
-          <input type="text" :value="username" disabled class="disabled-input" />
+        <div v-if="loading && !username" class="loading-placeholder">
+          載入中...
         </div>
 
-        <div class="field">
-          <label for="email">電子信箱 (Email)</label>
-          <input id="email" v-model="email" type="email" required />
-        </div>
+        <form v-else @submit.prevent="handleUpdate">
+          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+          <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
 
-        <hr class="divider" />
-        <h4 class="section-subtitle">變更密碼 (若不修改請留空)</h4>
+          <div class="field">
+            <label>使用者名稱 (帳號)</label>
+            <input type="text" :value="username" disabled class="disabled-input" />
+          </div>
 
-        <div class="field">
-          <label for="oldPassword">舊密碼</label>
-          <input id="oldPassword" v-model="oldPassword" type="password" />
-        </div>
+          <div class="field">
+            <label for="email">電子信箱 (Email)</label>
+            <input id="email" v-model="email" type="email" required />
+          </div>
 
-        <div class="field">
-          <label for="newPassword">新密碼</label>
-          <input id="newPassword" v-model="newPassword" type="password" />
-        </div>
+          <hr class="divider" />
+          <h4 class="section-subtitle">變更密碼 (若不修改請留空)</h4>
 
-        <div class="field">
-          <label for="confirmPassword">確認新密碼</label>
-          <input id="confirmPassword" v-model="confirmPassword" type="password" />
-        </div>
+          <div class="field">
+            <label for="oldPassword">舊密碼</label>
+            <input id="oldPassword" v-model="oldPassword" type="password" />
+          </div>
 
-        <button class="btn primary submit-btn" type="submit" :disabled="loading">
-          {{ loading ? "儲存中..." : "儲存變更" }}
-        </button>
+          <div class="field">
+            <label for="newPassword">新密碼</label>
+            <input id="newPassword" v-model="newPassword" type="password" />
+          </div>
 
-        <hr class="divider" />
-        <h4 class="section-subtitle">🎨 外觀主題切換</h4>
-        <div class="theme-switch-card">
+          <div class="field">
+            <label for="confirmPassword">確認新密碼</label>
+            <input id="confirmPassword" v-model="confirmPassword" type="password" />
+          </div>
+
+          <button class="btn primary submit-btn" type="submit" :disabled="loading">
+            {{ loading ? "儲存中..." : "儲存變更" }}
+          </button>
+        </form>
+      </template>
+
+      <!-- ===== 子頁面 2：外觀主題設定 ===== -->
+      <template v-else-if="activeTab === 'theme'">
+        <h2>🎨 外觀主題設定</h2>
+        <div class="theme-switch-card" style="margin-top: 20px;">
           <p class="theme-desc">選擇深色（黑暗）或淺色（一般）畫面色彩風格：</p>
           <div class="theme-options">
             <button
@@ -163,17 +200,19 @@ onMounted(() => {
             </button>
           </div>
         </div>
+      </template>
 
-        <hr class="divider" />
-        <h4 class="section-subtitle">📱 手機 App 安裝與描述檔</h4>
-        <div class="app-install-card">
+      <!-- ===== 子頁面 3：手機 App 安裝與描述檔 ===== -->
+      <template v-else-if="activeTab === 'app'">
+        <h2>📱 手機 App 安裝與描述檔</h2>
+        <div class="app-install-card" style="margin-top: 20px;">
           <p class="app-install-desc">
             您可以將 MiniTube 以全螢幕 Native App 形式放置在 iPhone 或 Android 手機主畫面：
           </p>
           <a href="/api/mobileconfig" class="btn secondary install-download-btn" target="_blank" download="MiniTube.mobileconfig">
             📲 下載 iOS 描述檔 (.mobileconfig)
           </a>
-          <details class="install-guide-details">
+          <details class="install-guide-details" open>
             <summary>📖 查看詳細安裝步驟指引</summary>
             <div class="guide-content">
               <h5>方法 1：iOS 描述檔一鍵安裝 (iPhone 專屬)</h5>
@@ -192,20 +231,55 @@ onMounted(() => {
             </div>
           </details>
         </div>
+      </template>
 
-        <hr class="divider" />
+      <hr class="divider" />
 
-        <div class="logout-container">
-          <button class="btn danger logout-btn" type="button" @click="handleLogout">
-            🚪 登出帳號
-          </button>
-        </div>
-      </form>
+      <div class="logout-container">
+        <button class="btn danger logout-btn" type="button" @click="handleLogout">
+          🚪 登出帳號
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.profile-tabs-nav {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 24px;
+  gap: 4px;
+}
+
+.profile-tab-btn {
+  flex: 1;
+  text-align: center;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.profile-tab-btn.active {
+  background: var(--accent-blue);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(255, 122, 0, 0.3);
+}
+
 .disabled-input {
   background: rgba(255, 255, 255, 0.05) !important;
   color: var(--text-secondary) !important;
