@@ -126,8 +126,9 @@ function clearApiUrl() {
         <button class="btn secondary app-install-btn" type="button" @click="isAppModalOpen = true" title="將 MiniTube 安裝為手機 App">
           📱 安裝 App
         </button>
-        <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
-        <button class="btn danger" type="button" @click="onLogout">登出</button>
+        <RouterLink class="btn secondary profile-nav-btn" :to="{ name: 'profile' }" title="查看與編輯個人資料">
+          👤 個人資料
+        </RouterLink>
       </template>
       <template v-else>
         <RouterLink class="btn" :to="{ name: 'login' }">登入</RouterLink>

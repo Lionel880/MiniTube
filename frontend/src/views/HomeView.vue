@@ -489,15 +489,8 @@ function formatDate(value) {
 
 <template>
   <div class="page">
-    <!-- 未登入提示 -->
-    <div v-if="!authStore.isLoggedIn" class="login-prompt">
-      <p>登入查看與管理你上傳的影片。</p>
-      <RouterLink class="btn primary" :to="{ name: 'login' }">前往登入</RouterLink>
-    </div>
-
-    <template v-else>
-      <!-- ===== 頂部操作列 ===== -->
-      <div class="action-bar">
+    <!-- ===== 頂部操作列 ===== -->
+    <div v-if="authStore.isLoggedIn" class="action-bar">
         <div class="action-bar-left">
           <RouterLink class="action-btn primary" :to="{ name: 'upload' }">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -851,7 +844,6 @@ function formatDate(value) {
         </div>
       </div>
 
-    </template>
   </div>
 </template>
 

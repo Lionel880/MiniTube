@@ -12,6 +12,19 @@ const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 
+import { useAuthStore } from "../store/auth";
+import { useRouter } from "vue-router";
+
+const authStore = useAuthStore();
+const router = useRouter();
+
+function handleLogout() {
+  if (confirm("確定要登出系統嗎？")) {
+    authStore.logout();
+    router.push({ name: "home" });
+  }
+}
+
 async function loadProfile() {
   loading.value = true;
   errorMessage.value = "";
@@ -118,6 +131,14 @@ onMounted(() => {
         <button class="btn primary submit-btn" type="submit" :disabled="loading">
           {{ loading ? "儲存中..." : "儲存變更" }}
         </button>
+
+        <hr class="divider" />
+
+        <div class="logout-container">
+          <button class="btn danger logout-btn" type="button" @click="handleLogout">
+            🚪 登出帳號
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -154,5 +175,19 @@ onMounted(() => {
   text-align: center;
   color: var(--text-muted);
   padding: 40px 0;
+}
+
+.logout-container {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  justify-content: center;
 }
 </style>
