@@ -22,6 +22,14 @@ import { onMounted, onUnmounted } from "vue";
 
 const isProfileMenuOpen = ref(false);
 const profileMenuRef = ref(null);
+const currentTheme = ref(localStorage.getItem("minitube_theme") || "dark");
+
+function toggleTheme() {
+  const newTheme = currentTheme.value === "dark" ? "light" : "dark";
+  currentTheme.value = newTheme;
+  localStorage.setItem("minitube_theme", newTheme);
+  document.documentElement.setAttribute("data-theme", newTheme);
+}
 
 function toggleProfileMenu(e) {
   if (e) e.stopPropagation();
@@ -189,20 +197,24 @@ function clearApiUrl() {
               </RouterLink>
               <RouterLink
                 class="popover-link-item"
-                :to="{ name: 'profile-theme' }"
-                @click="isProfileMenuOpen = false"
-              >
-                <span class="link-icon">🎨</span>
-                <span class="link-label">外觀主題設定</span>
-              </RouterLink>
-              <RouterLink
-                class="popover-link-item"
                 :to="{ name: 'profile-app' }"
                 @click="isProfileMenuOpen = false"
               >
                 <span class="link-icon">📱</span>
                 <span class="link-label">手機 App 安裝與描述檔</span>
               </RouterLink>
+              <!-- 🎨 外觀主題切換 (直接在列表內部點擊切換) -->
+              <div
+                class="popover-link-item theme-popover-item"
+                @click.stop="toggleTheme"
+                title="點擊切換 黑暗 / 一般 模式"
+              >
+                <span class="link-icon">{{ currentTheme === 'dark' ? '🌙' : '☀️' }}</span>
+                <span class="link-label">外觀模式</span>
+                <span class="theme-toggle-badge" :class="currentTheme">
+                  {{ currentTheme === 'dark' ? '黑暗' : '一般' }}
+                </span>
+              </div>
               <hr class="popover-hr" />
               <button
                 class="popover-link-item danger-item"
@@ -633,6 +645,34 @@ function clearApiUrl() {
   background: rgba(255, 255, 255, 0.08);
   color: var(--accent-blue);
   transform: translateX(2px);
+}
+
+.theme-popover-item {
+  user-select: none;
+}
+
+.theme-toggle-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-badge.dark {
+  background: rgba(255, 179, 0, 0.15);
+  color: #ffb300;
+  border-color: rgba(255, 179, 0, 0.3);
+}
+
+.theme-toggle-badge.light {
+  background: rgba(33, 150, 243, 0.15);
+  color: #2196f3;
+  border-color: rgba(33, 150, 243, 0.3);
 }
 
 .popover-link-item .link-icon {
