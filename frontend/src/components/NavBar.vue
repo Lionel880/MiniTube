@@ -138,9 +138,9 @@ function clearApiUrl() {
 
     <div class="nav-actions">
       <template v-if="authStore.isLoggedIn">
-        <!-- 上傳按鈕：在上傳中顯示進度並對所有頁面可見，非上傳中則只在特定頁面顯示 -->
+        <!-- 上傳按鈕：在上傳中顯示進度並對所有頁面可見，非上傳中則只在特定頁面顯示（個人資料頁除外） -->
         <RouterLink
-          v-if="route.name !== 'upload' && (uploadStore.isUploading || route.name !== 'home')"
+          v-if="route.name !== 'upload' && !route.path.startsWith('/profile') && (uploadStore.isUploading || route.name !== 'home')"
           class="btn primary"
           :class="{ 'uploading-btn': uploadStore.isUploading }"
           :to="{ name: 'upload' }"
