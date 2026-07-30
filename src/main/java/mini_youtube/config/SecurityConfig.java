@@ -39,8 +39,8 @@ public class SecurityConfig {
                 .accessDeniedHandler(restAccessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> auth
-                // 1. 允許前端靜態資源直接存取
-                .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**", "/static/**").permitAll()
+                // 1. 允許前端靜態資源與 PWA / App 描述檔直接存取
+                .requestMatchers("/", "/index.html", "/favicon.ico", "/favicon.png", "/apple-touch-icon.png", "/manifest.webmanifest", "/pwa-*.png", "/assets/**", "/static/**").permitAll()
                 // 2. 允許 Vue 頁面路徑直接存取（避免重新整理網頁時報 401）
                 .requestMatchers("/login", "/register", "/upload", "/search", "/videos/**").permitAll()
                 
@@ -48,7 +48,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers(
                     "/api/hello",
-                    "/api/auth/**"
+                    "/api/auth/**",
+                    "/api/mobileconfig"
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/videos", "/api/videos/search").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/videos/**").permitAll()

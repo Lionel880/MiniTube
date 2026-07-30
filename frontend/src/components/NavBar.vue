@@ -12,6 +12,7 @@ const uploadStore = useUploadStore();
 const keyword = ref("");
 
 const isModalOpen = ref(false);
+const isAppModalOpen = ref(false);
 const apiUrl = ref(localStorage.getItem("minitube_api_url") || "");
 const isTesting = ref(false);
 const testStatus = ref(""); // "success", "error", ""
@@ -122,6 +123,9 @@ function clearApiUrl() {
         >
           {{ uploadStore.isUploading ? `上傳中... ${uploadStore.progress}%` : '上傳影片' }}
         </RouterLink>
+        <button class="btn secondary app-install-btn" type="button" @click="isAppModalOpen = true" title="將 MiniTube 安裝為手機 App">
+          📱 安裝 App
+        </button>
         <RouterLink class="username-tag" :to="{ name: 'profile' }" title="修改資料與密碼">{{ authStore.username }}</RouterLink>
         <button class="btn danger" type="button" @click="onLogout">登出</button>
       </template>
@@ -165,6 +169,46 @@ function clearApiUrl() {
           <div style="flex-grow: 1;"></div>
           <button class="btn danger" type="button" @click="clearApiUrl">清除還原</button>
           <button class="btn primary" type="button" @click="saveApiUrl">儲存並重整</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- 手機 App / 描述檔安裝指引 Modal -->
+  <Transition name="fade">
+    <div v-if="isAppModalOpen" class="modal-overlay" @click.self="isAppModalOpen = false">
+      <div class="modal-content app-modal-content">
+        <h3>📱 安裝 MiniTube 手機 App</h3>
+        <p class="modal-desc">
+          您可以透過以下兩種方式，將 MiniTube 以全螢幕 Native App 形式放置在 iPhone 或 Android 手機主畫面：
+        </p>
+
+        <div class="app-install-section">
+          <h4>方法 1：下載 iOS 描述檔 (iPhone 專屬一鍵安裝)</h4>
+          <p class="section-desc">點擊下方按鈕下載 Apple 描述檔，安裝後即可在 iPhone 主畫面產生專屬 MiniTube App 圖示：</p>
+          <a href="/api/mobileconfig" class="btn primary install-download-btn" target="_blank" download="MiniTube.mobileconfig">
+            📲 下載 iOS 描述檔 (.mobileconfig)
+          </a>
+          <ol class="install-steps">
+            <li>點擊下載後，iOS 會提示「此網站正在嘗試下載設定描述檔」，請點擊<strong>「允許」</strong>。</li>
+            <li>開啟 iPhone <strong>「設定」➔ 最上方點擊「已下載描述檔」</strong>。</li>
+            <li>點擊右上角<strong>「安裝」</strong>並輸入手機解鎖密碼即完成安裝！</li>
+          </ol>
+        </div>
+
+        <hr class="modal-divider" />
+
+        <div class="app-install-section">
+          <h4>方法 2：Safari / Chrome「加入主畫面」(PWA 模式)</h4>
+          <ol class="install-steps">
+            <li>使用手機 Safari (iOS) 或 Chrome (Android) 開啟此網站。</li>
+            <li>點擊 Safari 底部的<strong>「分享 ➔」</strong>或 Chrome 右上角的<strong>「⋮」</strong>選單。</li>
+            <li>選擇<strong>「加入主畫面 (Add to Home Screen)」</strong>，即可將 MiniTube 當作 App 使用！</li>
+          </ol>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button class="btn primary" type="button" style="width: 100%;" @click="isAppModalOpen = false">我知道了</button>
         </div>
       </div>
     </div>
@@ -364,5 +408,43 @@ function clearApiUrl() {
     border-radius: 30px;
     backdrop-filter: blur(8px);
   }
+}
+
+.app-modal-content {
+  max-width: 480px;
+}
+.app-install-section {
+  margin-top: 16px;
+  text-align: left;
+}
+.app-install-section h4 {
+  font-size: 14px;
+  color: var(--accent-blue);
+  margin-bottom: 6px;
+}
+.section-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.install-download-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 10px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.install-steps {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-left: 20px;
+  line-height: 1.7;
+  margin: 8px 0;
+}
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 16px 0;
 }
 </style>
